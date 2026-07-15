@@ -1,0 +1,1663 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TwoDo-List</title>
+    <style>
+      :root {
+        --bg: #000000;
+        --card: #131315;
+        --row: #0c0c0e;
+        --row-border: #232326;
+        --green: #34d15c;
+        --green-dim: #1f8a3c;
+        --text: #f2f2f3;
+        --text-dim: #8d8d92;
+        --danger: #ff6b5e;
+        --checkbox-border: #55555a;
+        --placeholder-border: #333338;
+        --radius-card: 26px;
+        --radius-row: 18px;
+      }
+
+      [data-theme="light"] {
+        --bg: #f0f0f3;
+        --card: #ffffff;
+        --row: #f5f5f7;
+        --row-border: #e2e2e6;
+        --text: #1c1c1e;
+        --text-dim: #6e6e73;
+        --checkbox-border: #c7c7cc;
+        --placeholder-border: #d0d0d5;
+      }
+
+      [data-accent="blue"] {
+        --green: #3d8bff;
+        --green-dim: #2563eb;
+      }
+      [data-accent="red"] {
+        --green: #ff453a;
+        --green-dim: #c1291f;
+      }
+      [data-accent="orange"] {
+        --green: #ff9f0a;
+        --green-dim: #c9720a;
+      }
+      [data-accent="white"] {
+        --green: #f5f5f7;
+        --green-dim: #c7c7cc;
+      }
+      [data-accent="grey"] {
+        --green: #9aa0a6;
+        --green-dim: #6e7378;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          -apple-system,
+          BlinkMacSystemFont,
+          "SF Pro Text",
+          Segoe UI,
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+        overscroll-behavior-y: none;
+        transition:
+          background 0.2s ease,
+          color 0.2s ease;
+      }
+      #app {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 22px 16px 110px;
+        min-height: 100%;
+      }
+      .topbar {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 6px 6px 22px;
+      }
+      .topbar h1 {
+        font-size: 22px;
+        margin: 0;
+        letter-spacing: -0.3px;
+        font-weight: 700;
+      }
+      .total-pill {
+        font-size: 13px;
+        color: var(--text-dim);
+        background: var(--card);
+        border: 1px solid var(--row-border);
+        padding: 6px 12px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .section {
+        margin-bottom: 30px;
+      }
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 6px 12px;
+      }
+      .section-header .icon {
+        width: 26px;
+        height: 26px;
+        color: var(--green);
+        flex-shrink: 0;
+      }
+      .section-header .label {
+        font-size: 20px;
+        font-weight: 700;
+        flex: 1;
+        letter-spacing: -0.2px;
+      }
+      .count-badge {
+        min-width: 26px;
+        height: 26px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: var(--row-border);
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .expand-btn {
+        width: 30px;
+        height: 30px;
+        border: none;
+        background: transparent;
+        color: var(--green);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        transition: background 0.15s ease;
+      }
+      .expand-btn:hover {
+        background: var(--row-border);
+      }
+      .expand-btn svg {
+        width: 22px;
+        height: 22px;
+        transition: transform 0.25s ease;
+      }
+      .expand-btn.is-expanded svg {
+        transform: rotate(180deg);
+      }
+
+      .card {
+        background: var(--card);
+        border-radius: var(--radius-card);
+        padding: 8px;
+        min-height: 64px;
+      }
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        position: relative;
+        max-height: 230px;
+        overflow-y: auto;
+        padding-right: 2px;
+        scrollbar-width: thin;
+        transition: max-height 0.3s ease;
+      }
+      .list.expanded {
+        max-height: 1400px;
+      }
+      .list::-webkit-scrollbar {
+        width: 6px;
+      }
+      .list::-webkit-scrollbar-thumb {
+        background: var(--row-border);
+        border-radius: 999px;
+      }
+      .list::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: var(--row);
+        border-radius: var(--radius-row);
+        padding: 16px 14px;
+        transition:
+          opacity 0.3s ease,
+          transform 0.2s ease;
+        position: relative;
+        flex-shrink: 0;
+      }
+      .row.done {
+        opacity: 0.45;
+      }
+      .row.done .row-text {
+        text-decoration: line-through;
+        color: var(--text-dim);
+      }
+      .row.removing {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+
+      .checkbox {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 2px solid var(--checkbox-border);
+        flex-shrink: 0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        transition:
+          border-color 0.15s ease,
+          background 0.15s ease;
+      }
+      .checkbox.checked {
+        background: var(--green);
+        border-color: var(--green);
+      }
+      .checkbox svg {
+        width: 15px;
+        height: 15px;
+        color: #000;
+        opacity: 0;
+        transition: opacity 0.1s ease;
+      }
+      .checkbox.checked svg {
+        opacity: 1;
+      }
+
+      .row-text {
+        flex: 1;
+        font-size: 17px;
+        line-height: 1.3;
+        word-break: break-word;
+      }
+      .move-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        color: var(--green);
+        cursor: pointer;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+      }
+      .move-btn:hover {
+        background: var(--row-border);
+      }
+      .move-btn svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .reorder-controls {
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+      }
+      .reorder-btn {
+        width: 22px;
+        height: 19px;
+        border: none;
+        background: transparent;
+        color: var(--green);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        padding: 0;
+      }
+      .reorder-btn:hover {
+        background: var(--row-border);
+      }
+      .reorder-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+      .reorder-btn:disabled {
+        color: var(--text-dim);
+        opacity: 0.35;
+        cursor: default;
+      }
+      .reorder-btn:disabled:hover {
+        background: transparent;
+      }
+
+      .empty-hint {
+        color: var(--text-dim);
+        font-size: 14px;
+        text-align: center;
+        padding: 20px 10px;
+      }
+
+      .bottombar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 14px 22px calc(18px + env(safe-area-inset-bottom));
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: linear-gradient(to top, var(--bg) 60%, transparent);
+      }
+      .bottombar button {
+        background: none;
+        border: none;
+        color: var(--green);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .icon-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+      }
+      .icon-btn:hover {
+        background: var(--row-border);
+      }
+      .icon-btn svg {
+        width: 24px;
+        height: 24px;
+      }
+      .icon-btn.hidden {
+        display: none;
+      }
+      .add-btn {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--green);
+        color: #000;
+      }
+      .add-btn svg {
+        width: 26px;
+        height: 26px;
+      }
+      .add-btn:hover {
+        filter: brightness(1.1);
+      }
+
+      .panel {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-width: 640px;
+        margin: 0 auto;
+        background: var(--card);
+        border-top-left-radius: 24px;
+        border-top-right-radius: 24px;
+        padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+        transform: translateY(110%);
+        transition: transform 0.28s ease;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+        z-index: 6;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+      .panel.open {
+        transform: translateY(0);
+      }
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .panel-header h2 {
+        font-size: 18px;
+        margin: 0;
+        font-weight: 700;
+      }
+      .panel-close {
+        background: var(--row);
+        border: none;
+        color: var(--text-dim);
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .add-panel input[type="text"] {
+        width: 100%;
+        background: var(--row);
+        border: 1px solid var(--row-border);
+        border-radius: 14px;
+        padding: 14px;
+        color: var(--text);
+        font-size: 16px;
+        outline: none;
+        margin-bottom: 12px;
+      }
+      .add-panel input[type="text"]:focus {
+        border-color: var(--green);
+      }
+      .segmented {
+        display: flex;
+        background: var(--row);
+        border-radius: 12px;
+        padding: 4px;
+        margin-bottom: 14px;
+      }
+      .segmented button {
+        flex: 1;
+        padding: 10px;
+        border: none;
+        background: transparent;
+        color: var(--text-dim);
+        border-radius: 9px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .segmented button.active {
+        background: var(--green);
+        color: #000;
+      }
+      .add-panel .actions {
+        display: flex;
+        gap: 10px;
+      }
+      .add-panel .actions button {
+        flex: 1;
+        padding: 13px;
+        border: none;
+        border-radius: 14px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .actions .cancel {
+        background: var(--row);
+        color: var(--text);
+      }
+      .actions .confirm {
+        background: var(--green);
+        color: #000;
+      }
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+        z-index: 5;
+      }
+      .overlay.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .archive-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--row);
+        border-radius: 16px;
+        padding: 14px;
+        margin-bottom: 8px;
+      }
+      .archive-row .row-text {
+        opacity: 0.7;
+      }
+      .archive-row .badges {
+        font-size: 11px;
+        color: var(--text-dim);
+        background: var(--row-border);
+        padding: 3px 8px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+      .archive-actions {
+        display: flex;
+        gap: 6px;
+      }
+      .archive-actions button {
+        width: 34px;
+        height: 34px;
+        border: none;
+        border-radius: 9px;
+        background: var(--row-border);
+        color: var(--green);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .archive-actions button.delete {
+        color: var(--danger);
+      }
+      .archive-actions button svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .clear-all-btn {
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 14px;
+        border: 1px solid rgba(255, 107, 94, 0.35);
+        border-radius: 14px;
+        background: rgba(255, 107, 94, 0.08);
+        color: var(--danger);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .clear-all-btn:hover {
+        background: rgba(255, 107, 94, 0.16);
+      }
+      .clear-all-btn:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .clear-all-btn:disabled:hover {
+        background: rgba(255, 107, 94, 0.08);
+      }
+
+      .row-placeholder {
+        border-radius: var(--radius-row);
+        background: rgba(128, 128, 128, 0.08);
+        border: 1.5px dashed var(--placeholder-border);
+      }
+
+      .confirm-inline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        background: rgba(255, 107, 94, 0.1);
+        border: 1px solid rgba(255, 107, 94, 0.3);
+        border-radius: 14px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+        font-size: 14px;
+      }
+      .confirm-inline .actions {
+        display: flex;
+        gap: 8px;
+      }
+      .confirm-inline button {
+        border: none;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .confirm-inline .yes {
+        background: var(--danger);
+        color: #fff;
+      }
+      .confirm-inline .no {
+        background: var(--row-border);
+        color: var(--text);
+      }
+
+      .settings-section {
+        margin-bottom: 22px;
+      }
+      .settings-section h3 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-dim);
+        margin: 0 0 10px;
+        font-weight: 700;
+      }
+      .settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--row);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 8px;
+      }
+      .settings-row .settings-label {
+        font-size: 15px;
+      }
+      .settings-row .settings-hint {
+        font-size: 12px;
+        color: var(--text-dim);
+        margin-top: 2px;
+      }
+      .switch {
+        position: relative;
+        width: 46px;
+        height: 28px;
+        flex-shrink: 0;
+        border-radius: 999px;
+        background: var(--row-border);
+        border: none;
+        cursor: pointer;
+      }
+      .switch::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #fff;
+        transition: transform 0.2s ease;
+      }
+      .switch.on {
+        background: var(--green);
+      }
+      .switch.on::after {
+        transform: translateX(18px);
+      }
+      .accent-swatches {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .swatch {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+        position: relative;
+      }
+      .swatch.active {
+        border-color: var(--text);
+      }
+      .swatch svg {
+        width: 16px;
+        height: 16px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #000;
+        opacity: 0;
+      }
+      .swatch.active svg {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="topbar">
+        <h1 id="appTitle">TwoDo-List</h1>
+        <div class="total-pill" id="totalPill">–</div>
+      </div>
+
+      <div class="section" id="section-sooner">
+        <div class="section-header">
+          <svg
+            class="icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <rect x="3" y="5" width="18" height="16" rx="3" />
+            <path d="M8 3v4M16 3v4M3 10h18" />
+          </svg>
+          <div class="label">Sooner</div>
+          <div class="count-badge" id="count-sooner">0</div>
+          <button class="expand-btn" data-section="sooner" id="expandBtnSooner">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 3v6M9 6l3-3 3 3" />
+              <path d="M12 21v-6M9 18l3 3 3-3" />
+              <path d="M4 12h16" />
+            </svg>
+          </button>
+        </div>
+        <div class="card"><div class="list" id="list-sooner"></div></div>
+      </div>
+
+      <div class="section" id="section-later">
+        <div class="section-header">
+          <svg
+            class="icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+          >
+            <rect x="3" y="5" width="18" height="16" rx="3" />
+            <path d="M8 3v4M16 3v4M3 10h18" />
+            <circle cx="12" cy="15" r="0.6" fill="currentColor" />
+            <circle cx="9" cy="15" r="0.6" fill="currentColor" />
+            <circle cx="15" cy="15" r="0.6" fill="currentColor" />
+          </svg>
+          <div class="label">Later</div>
+          <div class="count-badge" id="count-later">0</div>
+          <button class="expand-btn" data-section="later" id="expandBtnLater">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 3v6M9 6l3-3 3 3" />
+              <path d="M12 21v-6M9 18l3 3 3-3" />
+              <path d="M4 12h16" />
+            </svg>
+          </button>
+        </div>
+        <div class="card"><div class="list" id="list-later"></div></div>
+      </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <div class="bottombar">
+      <button class="icon-btn" id="openSettingsBtn">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"
+          />
+        </svg>
+      </button>
+      <button class="add-btn" id="openAddBtn">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.4"
+          stroke-linecap="round"
+        >
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
+      <button class="icon-btn" id="openArchiveBtn">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
+          <rect x="3" y="4" width="18" height="5" rx="1.5" />
+          <path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="panel add-panel" id="addPanel">
+      <div class="panel-header">
+        <h2 id="addPanelTitle">Neue Aufgabe</h2>
+        <button class="panel-close" id="cancelAddBtn">✕</button>
+      </div>
+      <input type="text" id="newTodoText" maxlength="140" />
+      <div class="segmented">
+        <button class="active" data-target="sooner">Sooner</button>
+        <button data-target="later">Later</button>
+      </div>
+      <div class="actions">
+        <button class="cancel" id="cancelAddBtn2">Abbrechen</button>
+        <button class="confirm" id="confirmAddBtn">Hinzufügen</button>
+      </div>
+    </div>
+
+    <div class="panel" id="archivePanel">
+      <div class="panel-header">
+        <h2 id="archivePanelTitle">Archiv</h2>
+        <button class="panel-close" id="closeArchiveBtn">✕</button>
+      </div>
+      <button class="clear-all-btn" id="clearAllArchiveBtn">
+        Alle löschen
+      </button>
+      <div id="archiveConfirmSlot"></div>
+      <div id="archiveList"></div>
+    </div>
+
+    <div class="panel" id="settingsPanel">
+      <div class="panel-header">
+        <h2 id="settingsPanelTitle">Einstellungen</h2>
+        <button class="panel-close" id="closeSettingsBtn">✕</button>
+      </div>
+
+      <div class="settings-section">
+        <h3 id="appearanceLabel">Darstellung</h3>
+        <div class="settings-row">
+          <div>
+            <div class="settings-label" id="lightModeLabel">Light Mode</div>
+          </div>
+          <button class="switch" id="themeSwitch"></button>
+        </div>
+        <div class="accent-swatches" id="accentSwatches"></div>
+      </div>
+
+      <div class="settings-section">
+        <h3 id="archiveSectionLabel">Archiv</h3>
+        <div class="settings-row">
+          <div>
+            <div class="settings-label" id="archiveToggleLabel">
+              Archiv verwenden
+            </div>
+            <div class="settings-hint" id="archiveToggleHint">
+              Wenn deaktiviert, werden abgehakte Aufgaben sofort endgültig
+              gelöscht.
+            </div>
+          </div>
+          <button class="switch" id="archiveSwitch"></button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* ---------- i18n ---------- */
+      const browserLang = (
+        navigator.language ||
+        (navigator.languages && navigator.languages[0]) ||
+        "de"
+      ).toLowerCase();
+      const LANG = browserLang.startsWith("en") ? "en" : "de";
+      document.documentElement.lang = LANG;
+
+      const STRINGS = {
+        de: {
+          appTitle: "TwoDo-List",
+          totalSingular: "To-Do insgesamt",
+          totalPlural: "To-Dos insgesamt",
+          emptyHint: "Keine Aufgaben hier.",
+          newTodoPlaceholder: "Neue Aufgabe eingeben…",
+          addPanelTitle: "Neue Aufgabe",
+          cancel: "Abbrechen",
+          add: "Hinzufügen",
+          archivePanelTitle: "Archiv",
+          archiveEmpty: "Noch keine erledigten Aufgaben im Archiv.",
+          clearAll: "Alle löschen",
+          clearAllConfirm:
+            "Wirklich alle Aufgaben im Archiv endgültig löschen?",
+          yes: "Ja, löschen",
+          no: "Abbrechen",
+          wasSooner: "war: Sooner",
+          wasLater: "war: Later",
+          restoreTitle: "Wiederherstellen",
+          deleteTitle: "Endgültig löschen",
+          settingsPanelTitle: "Einstellungen",
+          appearanceLabel: "Darstellung",
+          lightModeLabel: "Light Mode",
+          archiveSectionLabel: "Archiv",
+          archiveToggleLabel: "Archiv verwenden",
+          archiveToggleHint:
+            "Wenn deaktiviert, werden abgehakte Aufgaben sofort endgültig gelöscht.",
+          checkboxArchive: "Erledigt & ins Archiv",
+          checkboxDelete: "Erledigt & löschen",
+          moveToLater: "Nach Later verschieben",
+          moveToSooner: "Nach Sooner verschieben",
+          reorderUp: "Nach oben verschieben",
+          reorderDown: "Nach unten verschieben",
+          expandTitle: "Alle anzeigen / einklappen",
+        },
+        en: {
+          appTitle: "TwoDo-List",
+          totalSingular: "to-do total",
+          totalPlural: "to-dos total",
+          emptyHint: "No tasks here.",
+          newTodoPlaceholder: "Enter a new task…",
+          addPanelTitle: "New task",
+          cancel: "Cancel",
+          add: "Add",
+          archivePanelTitle: "Archive",
+          archiveEmpty: "No completed tasks in the archive yet.",
+          clearAll: "Delete all",
+          clearAllConfirm:
+            "Really delete all tasks in the archive permanently?",
+          yes: "Yes, delete",
+          no: "Cancel",
+          wasSooner: "was: Sooner",
+          wasLater: "was: Later",
+          restoreTitle: "Restore",
+          deleteTitle: "Delete permanently",
+          settingsPanelTitle: "Settings",
+          appearanceLabel: "Appearance",
+          lightModeLabel: "Light mode",
+          archiveSectionLabel: "Archive",
+          archiveToggleLabel: "Use archive",
+          archiveToggleHint:
+            "When disabled, checked-off tasks are deleted immediately.",
+          checkboxArchive: "Done & archive",
+          checkboxDelete: "Done & delete",
+          moveToLater: "Move to Later",
+          moveToSooner: "Move to Sooner",
+          reorderUp: "Move up",
+          reorderDown: "Move down",
+          expandTitle: "Show all / collapse",
+        },
+      };
+      function t(key) {
+        return STRINGS[LANG][key] || key;
+      }
+
+      function applyStaticTranslations() {
+        document.title = t("appTitle");
+        document.getElementById("appTitle").textContent = t("appTitle");
+        document.getElementById("newTodoText").placeholder =
+          t("newTodoPlaceholder");
+        document.getElementById("addPanelTitle").textContent =
+          t("addPanelTitle");
+        document.getElementById("cancelAddBtn2").textContent = t("cancel");
+        document.getElementById("confirmAddBtn").textContent = t("add");
+        document.getElementById("archivePanelTitle").textContent =
+          t("archivePanelTitle");
+        document.getElementById("clearAllArchiveBtn").textContent =
+          t("clearAll");
+        document.getElementById("settingsPanelTitle").textContent =
+          t("settingsPanelTitle");
+        document.getElementById("appearanceLabel").textContent =
+          t("appearanceLabel");
+        document.getElementById("lightModeLabel").textContent =
+          t("lightModeLabel");
+        document.getElementById("archiveSectionLabel").textContent = t(
+          "archiveSectionLabel",
+        );
+        document.getElementById("archiveToggleLabel").textContent =
+          t("archiveToggleLabel");
+        document.getElementById("archiveToggleHint").textContent =
+          t("archiveToggleHint");
+        document
+          .querySelectorAll(".expand-btn")
+          .forEach((b) => (b.title = t("expandTitle")));
+        document.getElementById("openSettingsBtn").title =
+          t("settingsPanelTitle");
+        document.getElementById("openArchiveBtn").title =
+          t("archivePanelTitle");
+      }
+
+      /* ---------- Cookie storage ---------- */
+      const COOKIE_NAME = "todoAppState_v1";
+      const COOKIE_DAYS = 730;
+
+      function setCookie(name, value, days) {
+        const maxAge = days * 24 * 60 * 60;
+        document.cookie =
+          name +
+          "=" +
+          encodeURIComponent(value) +
+          "; max-age=" +
+          maxAge +
+          "; path=/; SameSite=Lax";
+      }
+      function getCookie(name) {
+        const match = document.cookie.match(
+          new RegExp("(?:^|; )" + name + "=([^;]*)"),
+        );
+        return match ? decodeURIComponent(match[1]) : null;
+      }
+
+      const COLLAPSE_LIMIT = 3;
+
+      let state = {
+        todos: [],
+        expanded: { sooner: false, later: false },
+        settings: { theme: "dark", accent: "green", archiveEnabled: true },
+      };
+      let newTodoTarget = "sooner";
+
+      function cryptoId() {
+        return (
+          "id-" +
+          Math.random().toString(36).slice(2, 10) +
+          Date.now().toString(36)
+        );
+      }
+
+      const defaultTodos = () => {
+        if (LANG === "en") {
+          return [
+            {
+              id: cryptoId(),
+              text: "Check me off – I\u2019ll move to the archive automatically",
+              section: "sooner",
+              done: false,
+              archived: false,
+              order: 0,
+              archivedAt: null,
+            },
+            {
+              id: cryptoId(),
+              text: "Move me with the \u25B2\u25BC arrows or by dragging",
+              section: "sooner",
+              done: false,
+              archived: false,
+              order: 1,
+              archivedAt: null,
+            },
+            {
+              id: cryptoId(),
+              text: "...or move me to test the ordering",
+              section: "sooner",
+              done: false,
+              archived: false,
+              order: 2,
+              archivedAt: null,
+            },
+            {
+              id: cryptoId(),
+              text: "Add a new task below using the plus button",
+              section: "sooner",
+              done: false,
+              archived: false,
+              order: 3,
+              archivedAt: null,
+            },
+            {
+              id: cryptoId(),
+              text: "Check out the archive and restore a task",
+              section: "later",
+              done: false,
+              archived: false,
+              order: 0,
+              archivedAt: null,
+            },
+            {
+              id: cryptoId(),
+              text: "I\u2019m already done – bring me back from the archive!",
+              section: "later",
+              done: false,
+              archived: true,
+              order: 1,
+              archivedAt: Date.now() - 60000,
+            },
+          ];
+        }
+        return [
+          {
+            id: cryptoId(),
+            text: "Hake mich ab – ich wandere danach automatisch ins Archiv",
+            section: "sooner",
+            done: false,
+            archived: false,
+            order: 0,
+            archivedAt: null,
+          },
+          {
+            id: cryptoId(),
+            text: "Bring mich mit den Pfeilen \u25B2\u25BC oder per Ziehen an eine andere Stelle",
+            section: "sooner",
+            done: false,
+            archived: false,
+            order: 1,
+            archivedAt: null,
+          },
+          {
+            id: cryptoId(),
+            text: "...oder verschiebe mich, um die Reihenfolge zu testen",
+            section: "sooner",
+            done: false,
+            archived: false,
+            order: 2,
+            archivedAt: null,
+          },
+          {
+            id: cryptoId(),
+            text: "Füge unten über das Plus-Symbol eine neue Aufgabe hinzu",
+            section: "sooner",
+            done: false,
+            archived: false,
+            order: 3,
+            archivedAt: null,
+          },
+          {
+            id: cryptoId(),
+            text: "Schau im Archiv vorbei und stelle eine Aufgabe wieder her",
+            section: "later",
+            done: false,
+            archived: false,
+            order: 0,
+            archivedAt: null,
+          },
+          {
+            id: cryptoId(),
+            text: "Ich wurde schon erledigt – hol mich aus dem Archiv zurück!",
+            section: "later",
+            done: false,
+            archived: true,
+            order: 1,
+            archivedAt: Date.now() - 60000,
+          },
+        ];
+      };
+
+      function loadState() {
+        try {
+          const raw = getCookie(COOKIE_NAME);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.todos)) {
+              state = {
+                todos: parsed.todos,
+                expanded: parsed.expanded || { sooner: false, later: false },
+                settings: Object.assign(
+                  { theme: "dark", accent: "green", archiveEnabled: true },
+                  parsed.settings || {},
+                ),
+              };
+              state.todos.forEach((tItem, i) => {
+                if (typeof tItem.archived === "undefined")
+                  tItem.archived = !!tItem.done;
+                if (typeof tItem.order === "undefined") tItem.order = i;
+                if (typeof tItem.archivedAt === "undefined")
+                  tItem.archivedAt = null;
+              });
+              applySettingsToDom();
+              render();
+              return;
+            }
+          }
+        } catch (e) {
+          console.log(
+            "Kein gespeicherter Stand gefunden, starte mit Standardliste.",
+            e,
+          );
+        }
+        state.todos = defaultTodos();
+        applySettingsToDom();
+        render();
+        saveState();
+      }
+
+      function saveState() {
+        try {
+          setCookie(COOKIE_NAME, JSON.stringify(state), COOKIE_DAYS);
+        } catch (e) {
+          console.error("Speichern fehlgeschlagen", e);
+        }
+      }
+
+      function applySettingsToDom() {
+        document.documentElement.setAttribute(
+          "data-theme",
+          state.settings.theme === "light" ? "light" : "dark",
+        );
+        document.documentElement.setAttribute(
+          "data-accent",
+          state.settings.accent || "green",
+        );
+        document
+          .getElementById("themeSwitch")
+          .classList.toggle("on", state.settings.theme === "light");
+        document
+          .getElementById("archiveSwitch")
+          .classList.toggle("on", state.settings.archiveEnabled !== false);
+        document
+          .getElementById("openArchiveBtn")
+          .classList.toggle("hidden", state.settings.archiveEnabled === false);
+        renderAccentSwatches();
+      }
+
+      const ACCENTS = [
+        { key: "green", hex: "#34d15c" },
+        { key: "blue", hex: "#3d8bff" },
+        { key: "red", hex: "#ff453a" },
+        { key: "orange", hex: "#ff9f0a" },
+        { key: "white", hex: "#f5f5f7" },
+        { key: "grey", hex: "#9aa0a6" },
+      ];
+      function renderAccentSwatches() {
+        const wrap = document.getElementById("accentSwatches");
+        wrap.innerHTML = "";
+        ACCENTS.forEach((a) => {
+          const btn = document.createElement("button");
+          btn.className =
+            "swatch" + (state.settings.accent === a.key ? " active" : "");
+          btn.style.background = a.hex;
+          btn.title = a.key;
+          btn.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+          btn.addEventListener("click", () => {
+            state.settings.accent = a.key;
+            applySettingsToDom();
+            saveState();
+          });
+          wrap.appendChild(btn);
+        });
+      }
+
+      function render() {
+        renderSection("sooner");
+        renderSection("later");
+        const activeTotal = state.todos.filter((t) => !t.archived).length;
+        document.getElementById("totalPill").textContent =
+          activeTotal +
+          " " +
+          (activeTotal === 1 ? t("totalSingular") : t("totalPlural"));
+        renderArchive();
+      }
+
+      function renderSection(section) {
+        const listEl = document.getElementById("list-" + section);
+        const countEl = document.getElementById("count-" + section);
+        const items = state.todos
+          .filter((tItem) => tItem.section === section && !tItem.archived)
+          .sort((a, b) => a.order - b.order);
+        countEl.textContent = items.length;
+
+        const expanded = state.expanded[section];
+        listEl.classList.toggle("expanded", expanded);
+
+        listEl.innerHTML = "";
+        if (items.length === 0) {
+          const hint = document.createElement("div");
+          hint.className = "empty-hint";
+          hint.textContent = t("emptyHint");
+          listEl.appendChild(hint);
+        } else {
+          items.forEach((item, idx) => {
+            listEl.appendChild(
+              buildRow(item, section, idx === 0, idx === items.length - 1),
+            );
+          });
+        }
+
+        const btn = document.querySelector(
+          `.expand-btn[data-section="${section}"]`,
+        );
+        btn.style.opacity = items.length > COLLAPSE_LIMIT ? "1" : "0.35";
+        btn.classList.toggle("is-expanded", expanded);
+      }
+
+      function buildRow(item, section, isFirst, isLast) {
+        const row = document.createElement("div");
+        row.className = "row" + (item.done ? " done" : "");
+        row.dataset.id = item.id;
+
+        const checkbox = document.createElement("button");
+        checkbox.className = "checkbox" + (item.done ? " checked" : "");
+        checkbox.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+        checkbox.title =
+          state.settings.archiveEnabled === false
+            ? t("checkboxDelete")
+            : t("checkboxArchive");
+        checkbox.addEventListener("click", (e) => {
+          e.stopPropagation();
+          completeItem(item.id, row);
+        });
+
+        const text = document.createElement("div");
+        text.className = "row-text";
+        text.textContent = item.text;
+
+        const reorderWrap = document.createElement("div");
+        reorderWrap.className = "reorder-controls";
+
+        const upBtn = document.createElement("button");
+        upBtn.className = "reorder-btn";
+        upBtn.title = t("reorderUp");
+        upBtn.disabled = isFirst;
+        upBtn.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>';
+        upBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          reorderItem(item.id, section, -1);
+        });
+
+        const downBtn = document.createElement("button");
+        downBtn.className = "reorder-btn";
+        downBtn.title = t("reorderDown");
+        downBtn.disabled = isLast;
+        downBtn.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+        downBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          reorderItem(item.id, section, 1);
+        });
+
+        reorderWrap.appendChild(upBtn);
+        reorderWrap.appendChild(downBtn);
+
+        const moveBtn = document.createElement("button");
+        moveBtn.className = "move-btn";
+        moveBtn.title =
+          section === "sooner" ? t("moveToLater") : t("moveToSooner");
+        if (section === "sooner") {
+          moveBtn.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+        } else {
+          moveBtn.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>';
+        }
+        moveBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          moveItem(item.id);
+        });
+
+        row.appendChild(checkbox);
+        row.appendChild(text);
+        row.appendChild(reorderWrap);
+        row.appendChild(moveBtn);
+
+        return row;
+      }
+
+      function reorderItem(id, section, direction) {
+        const items = state.todos
+          .filter((tItem) => tItem.section === section && !tItem.archived)
+          .sort((a, b) => a.order - b.order);
+        const idx = items.findIndex((tItem) => tItem.id === id);
+        const swapIdx = idx + direction;
+        if (idx === -1 || swapIdx < 0 || swapIdx >= items.length) return;
+        const a = items[idx];
+        const b = items[swapIdx];
+        const tmp = a.order;
+        a.order = b.order;
+        b.order = tmp;
+        render();
+        saveState();
+      }
+
+      function completeItem(id, rowEl) {
+        const item = state.todos.find((tItem) => tItem.id === id);
+        if (!item) return;
+        item.done = true;
+        rowEl.classList.add("done");
+        saveState();
+        const archiveOn = state.settings.archiveEnabled !== false;
+        setTimeout(() => {
+          rowEl.classList.add("removing");
+          setTimeout(() => {
+            if (archiveOn) {
+              item.archived = true;
+              item.archivedAt = Date.now();
+            } else {
+              state.todos = state.todos.filter((tItem) => tItem.id !== id);
+            }
+            render();
+            saveState();
+          }, 260);
+        }, 350);
+      }
+
+      function moveItem(id) {
+        const item = state.todos.find((tItem) => tItem.id === id);
+        if (!item) return;
+        const newSection = item.section === "sooner" ? "later" : "sooner";
+        const maxOrder = Math.max(
+          -1,
+          ...state.todos
+            .filter((tItem) => tItem.section === newSection && !tItem.archived)
+            .map((tItem) => tItem.order),
+        );
+        item.section = newSection;
+        item.order = maxOrder + 1;
+        render();
+        saveState();
+      }
+
+      function toggleExpand(section) {
+        state.expanded[section] = !state.expanded[section];
+        render();
+        saveState();
+      }
+
+      function addTodo(text, section) {
+        const clean = text.trim();
+        if (!clean) return;
+        const maxOrder = Math.max(
+          -1,
+          ...state.todos
+            .filter((tItem) => tItem.section === section && !tItem.archived)
+            .map((tItem) => tItem.order),
+        );
+        state.todos.push({
+          id: cryptoId(),
+          text: clean,
+          section,
+          done: false,
+          archived: false,
+          order: maxOrder + 1,
+          archivedAt: null,
+        });
+        state.expanded[section] = true;
+        render();
+        saveState();
+      }
+
+      function renderArchive() {
+        const listEl = document.getElementById("archiveList");
+        const items = state.todos
+          .filter((tItem) => tItem.archived)
+          .sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
+        const clearAllBtn = document.getElementById("clearAllArchiveBtn");
+        clearAllBtn.disabled = items.length === 0;
+        listEl.innerHTML = "";
+        if (items.length === 0) {
+          const hint = document.createElement("div");
+          hint.className = "empty-hint";
+          hint.textContent = t("archiveEmpty");
+          listEl.appendChild(hint);
+          return;
+        }
+        items.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "archive-row";
+
+          const text = document.createElement("div");
+          text.className = "row-text";
+          text.textContent = item.text;
+
+          const badge = document.createElement("div");
+          badge.className = "badges";
+          badge.textContent =
+            item.section === "sooner" ? t("wasSooner") : t("wasLater");
+
+          const actions = document.createElement("div");
+          actions.className = "archive-actions";
+
+          const restoreBtn = document.createElement("button");
+          restoreBtn.title = t("restoreTitle");
+          restoreBtn.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>';
+          restoreBtn.addEventListener("click", () => restoreItem(item.id));
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "delete";
+          deleteBtn.title = t("deleteTitle");
+          deleteBtn.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/></svg>';
+          deleteBtn.addEventListener("click", () =>
+            deleteItemPermanently(item.id),
+          );
+
+          actions.appendChild(restoreBtn);
+          actions.appendChild(deleteBtn);
+          row.appendChild(text);
+          row.appendChild(badge);
+          row.appendChild(actions);
+          listEl.appendChild(row);
+        });
+      }
+
+      function restoreItem(id) {
+        const item = state.todos.find((tItem) => tItem.id === id);
+        if (!item) return;
+        const maxOrder = Math.max(
+          -1,
+          ...state.todos
+            .filter(
+              (tItem) => tItem.section === item.section && !tItem.archived,
+            )
+            .map((tItem) => tItem.order),
+        );
+        item.archived = false;
+        item.done = false;
+        item.archivedAt = null;
+        item.order = maxOrder + 1;
+        render();
+        saveState();
+      }
+
+      function deleteItemPermanently(id) {
+        state.todos = state.todos.filter((tItem) => tItem.id !== id);
+        render();
+        saveState();
+      }
+
+      function clearAllArchived() {
+        const hasArchived = state.todos.some((tItem) => tItem.archived);
+        if (!hasArchived) return;
+
+        const slot = document.getElementById("archiveConfirmSlot");
+        slot.innerHTML = "";
+        const box = document.createElement("div");
+        box.className = "confirm-inline";
+        const label = document.createElement("div");
+        label.textContent = t("clearAllConfirm");
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        const yesBtn = document.createElement("button");
+        yesBtn.className = "yes";
+        yesBtn.textContent = t("yes");
+        yesBtn.addEventListener("click", () => {
+          state.todos = state.todos.filter((tItem) => !tItem.archived);
+          slot.innerHTML = "";
+          render();
+          saveState();
+        });
+        const noBtn = document.createElement("button");
+        noBtn.className = "no";
+        noBtn.textContent = t("no");
+        noBtn.addEventListener("click", () => {
+          slot.innerHTML = "";
+        });
+        actions.appendChild(noBtn);
+        actions.appendChild(yesBtn);
+        box.appendChild(label);
+        box.appendChild(actions);
+        slot.appendChild(box);
+      }
+
+      document.querySelectorAll(".expand-btn").forEach((btn) => {
+        btn.addEventListener("click", () => toggleExpand(btn.dataset.section));
+      });
+
+      /* ---------- Add panel ---------- */
+      const overlay = document.getElementById("overlay");
+      const addPanel = document.getElementById("addPanel");
+      const archivePanel = document.getElementById("archivePanel");
+      const settingsPanel = document.getElementById("settingsPanel");
+      const newTodoInput = document.getElementById("newTodoText");
+
+      function closeAllPanels() {
+        addPanel.classList.remove("open");
+        archivePanel.classList.remove("open");
+        settingsPanel.classList.remove("open");
+        overlay.classList.remove("open");
+        document.getElementById("archiveConfirmSlot").innerHTML = "";
+      }
+
+      function openAddPanel() {
+        closeAllPanels();
+        addPanel.classList.add("open");
+        overlay.classList.add("open");
+        newTodoInput.focus({ preventScroll: true });
+        requestAnimationFrame(() =>
+          newTodoInput.focus({ preventScroll: true }),
+        );
+      }
+      function closeAddPanel() {
+        addPanel.classList.remove("open");
+        overlay.classList.remove("open");
+        newTodoInput.value = "";
+      }
+      document
+        .getElementById("openAddBtn")
+        .addEventListener("click", openAddPanel);
+      document
+        .getElementById("cancelAddBtn")
+        .addEventListener("click", closeAddPanel);
+      document
+        .getElementById("cancelAddBtn2")
+        .addEventListener("click", closeAddPanel);
+
+      document.querySelectorAll(".segmented button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document
+            .querySelectorAll(".segmented button")
+            .forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          newTodoTarget = btn.dataset.target;
+        });
+      });
+
+      document.getElementById("confirmAddBtn").addEventListener("click", () => {
+        addTodo(newTodoInput.value, newTodoTarget);
+        closeAddPanel();
+      });
+      newTodoInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          addTodo(newTodoInput.value, newTodoTarget);
+          closeAddPanel();
+        }
+      });
+
+      /* ---------- Archive panel ---------- */
+      function openArchivePanel() {
+        closeAllPanels();
+        archivePanel.classList.add("open");
+        overlay.classList.add("open");
+        renderArchive();
+      }
+      function closeArchivePanel() {
+        archivePanel.classList.remove("open");
+        overlay.classList.remove("open");
+        document.getElementById("archiveConfirmSlot").innerHTML = "";
+      }
+      document
+        .getElementById("openArchiveBtn")
+        .addEventListener("click", openArchivePanel);
+      document
+        .getElementById("closeArchiveBtn")
+        .addEventListener("click", closeArchivePanel);
+      document
+        .getElementById("clearAllArchiveBtn")
+        .addEventListener("click", clearAllArchived);
+
+      /* ---------- Settings panel ---------- */
+      function openSettingsPanel() {
+        closeAllPanels();
+        settingsPanel.classList.add("open");
+        overlay.classList.add("open");
+      }
+      function closeSettingsPanel() {
+        settingsPanel.classList.remove("open");
+        overlay.classList.remove("open");
+      }
+      document
+        .getElementById("openSettingsBtn")
+        .addEventListener("click", openSettingsPanel);
+      document
+        .getElementById("closeSettingsBtn")
+        .addEventListener("click", closeSettingsPanel);
+
+      document.getElementById("themeSwitch").addEventListener("click", () => {
+        state.settings.theme =
+          state.settings.theme === "light" ? "dark" : "light";
+        applySettingsToDom();
+        saveState();
+      });
+
+      document.getElementById("archiveSwitch").addEventListener("click", () => {
+        state.settings.archiveEnabled =
+          state.settings.archiveEnabled === false ? true : false;
+        applySettingsToDom();
+        saveState();
+      });
+
+      overlay.addEventListener("click", closeAllPanels);
+
+      applyStaticTranslations();
+      loadState();
+    </script>
+  </body>
+</html>
