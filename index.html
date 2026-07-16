@@ -207,6 +207,11 @@
         position: relative;
         flex-shrink: 0;
       }
+      .row.dragging {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+        transition: none;
+        opacity: 0.97;
+      }
       .row.done {
         opacity: 0.45;
       }
@@ -290,38 +295,30 @@
         height: 20px;
       }
 
-      .reorder-controls {
-        display: flex;
-        flex-direction: column;
-        flex-shrink: 0;
-      }
-      .reorder-btn {
-        width: 22px;
-        height: 19px;
+      .drag-handle {
+        width: 32px;
+        height: 32px;
         border: none;
         background: transparent;
-        color: var(--green);
-        cursor: pointer;
+        color: var(--text-dim);
+        cursor: grab;
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 6px;
-        padding: 0;
+        border-radius: 8px;
+        touch-action: none;
       }
-      .reorder-btn:hover {
+      .drag-handle:hover {
         background: var(--row-border);
+        color: var(--text);
       }
-      .reorder-btn svg {
-        width: 14px;
-        height: 14px;
+      .drag-handle:active {
+        cursor: grabbing;
       }
-      .reorder-btn:disabled {
-        color: var(--text-dim);
-        opacity: 0.35;
-        cursor: default;
-      }
-      .reorder-btn:disabled:hover {
-        background: transparent;
+      .drag-handle svg {
+        width: 20px;
+        height: 16px;
       }
 
       .empty-hint {
@@ -922,6 +919,7 @@
           reorderDown: "Nach unten verschieben",
           expandTitle: "Alle anzeigen / einklappen",
           editHint: "Zum Bearbeiten antippen",
+          dragHandleTitle: "Ziehen zum Sortieren",
         },
         en: {
           appTitle: "TwoDo-List",
@@ -958,6 +956,7 @@
           reorderDown: "Move down",
           expandTitle: "Show all / collapse",
           editHint: "Tap to edit",
+          dragHandleTitle: "Drag to reorder",
         },
       };
       function t(key) {
@@ -1051,7 +1050,7 @@
             },
             {
               id: cryptoId(),
-              text: "Move me with the \u25B2\u25BC arrows to change the order",
+              text: "Grab my handle (\u2261) and drag me to reorder",
               section: "sooner",
               done: false,
               archived: false,
@@ -1108,7 +1107,7 @@
           },
           {
             id: cryptoId(),
-            text: "Bring mich mit den Pfeilen \u25B2\u25BC in eine andere Reihenfolge",
+            text: "Fasse meinen Griff (\u2261) an und zieh mich zum Sortieren",
             section: "sooner",
             done: false,
             archived: false,
@@ -1184,6 +1183,15 @@
               state.todos = state.todos.filter(
                 (tItem) => !obsoleteTexts.includes(tItem.text),
               );
+              const renameMap = {
+                "Bring mich mit den Pfeilen \u25B2\u25BC in eine andere Reihenfolge":
+                  "Fasse meinen Griff (\u2261) an und zieh mich zum Sortieren",
+                "Move me with the \u25B2\u25BC arrows to change the order":
+                  "Grab my handle (\u2261) and drag me to reorder",
+              };
+              state.todos.forEach((tItem) => {
+                if (renameMap[tItem.text]) tItem.text = renameMap[tItem.text];
+              });
               applySettingsToDom();
               render();
               return;
@@ -1328,33 +1336,11 @@
           startEditRow(item, text, row);
         });
 
-        const reorderWrap = document.createElement("div");
-        reorderWrap.className = "reorder-controls";
-
-        const upBtn = document.createElement("button");
-        upBtn.className = "reorder-btn";
-        upBtn.title = t("reorderUp");
-        upBtn.disabled = isFirst;
-        upBtn.innerHTML =
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>';
-        upBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          reorderItem(item.id, section, -1);
-        });
-
-        const downBtn = document.createElement("button");
-        downBtn.className = "reorder-btn";
-        downBtn.title = t("reorderDown");
-        downBtn.disabled = isLast;
-        downBtn.innerHTML =
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
-        downBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          reorderItem(item.id, section, 1);
-        });
-
-        reorderWrap.appendChild(upBtn);
-        reorderWrap.appendChild(downBtn);
+        const dragHandle = document.createElement("button");
+        dragHandle.className = "drag-handle";
+        dragHandle.title = t("dragHandleTitle");
+        dragHandle.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
 
         const moveBtn = document.createElement("button");
         moveBtn.className = "move-btn";
@@ -1374,8 +1360,10 @@
 
         row.appendChild(checkbox);
         row.appendChild(text);
-        row.appendChild(reorderWrap);
+        row.appendChild(dragHandle);
         row.appendChild(moveBtn);
+
+        attachDragHandle(dragHandle, row, item, section);
 
         return row;
       }
@@ -1418,20 +1406,146 @@
         input.addEventListener("click", (e) => e.stopPropagation());
       }
 
-      function reorderItem(id, section, direction) {
-        const items = state.todos
-          .filter((tItem) => tItem.section === section && !tItem.archived)
-          .sort((a, b) => a.order - b.order);
-        const idx = items.findIndex((tItem) => tItem.id === id);
-        const swapIdx = idx + direction;
-        if (idx === -1 || swapIdx < 0 || swapIdx >= items.length) return;
-        const a = items[idx];
-        const b = items[swapIdx];
-        const tmp = a.order;
-        a.order = b.order;
-        b.order = tmp;
-        render();
-        saveState();
+      let dragCtx = null;
+
+      function attachDragHandle(handle, row, item, section) {
+        handle.addEventListener("pointerdown", (e) => {
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          e.preventDefault();
+          startDrag(row, item, section, e);
+        });
+      }
+
+      function startDrag(row, item, section, e) {
+        const list = document.getElementById("list-" + section);
+        const cardSooner = document
+          .getElementById("list-sooner")
+          .closest(".card");
+        const cardLater = document
+          .getElementById("list-later")
+          .closest(".card");
+        const rect = row.getBoundingClientRect();
+
+        const placeholder = document.createElement("div");
+        placeholder.className = "row-placeholder";
+        placeholder.style.height = rect.height + "px";
+        placeholder.dataset.id = item.id;
+        row.replaceWith(placeholder);
+
+        document.body.appendChild(row);
+        row.classList.add("dragging");
+        row.style.position = "fixed";
+        row.style.left = rect.left + "px";
+        row.style.top = rect.top + "px";
+        row.style.width = rect.width + "px";
+        row.style.margin = "0";
+        row.style.zIndex = "9999";
+        row.style.pointerEvents = "none";
+
+        document.body.style.overflow = "hidden";
+        document.body.style.userSelect = "none";
+
+        const listSooner = document.getElementById("list-sooner");
+        const listLater = document.getElementById("list-later");
+        const wasExpandedSooner = listSooner.classList.contains("expanded");
+        const wasExpandedLater = listLater.classList.contains("expanded");
+        listSooner.classList.add("expanded");
+        listLater.classList.add("expanded");
+
+        dragCtx = {
+          row,
+          placeholder,
+          list,
+          section,
+          item,
+          cardSooner,
+          cardLater,
+          listSooner,
+          listLater,
+          wasExpandedSooner,
+          wasExpandedLater,
+          startClientY: e.clientY,
+          initialTop: rect.top,
+          rowHeight: rect.height,
+        };
+
+        const onMove = (ev) => {
+          if (!dragCtx) return;
+          ev.preventDefault();
+          const delta = ev.clientY - dragCtx.startClientY;
+          const newTop = dragCtx.initialTop + delta;
+          dragCtx.row.style.top = newTop + "px";
+          const rowMid = newTop + dragCtx.rowHeight / 2;
+
+          const soonerRect = dragCtx.cardSooner.getBoundingClientRect();
+          const laterRect = dragCtx.cardLater.getBoundingClientRect();
+          const boundary = (soonerRect.bottom + laterRect.top) / 2;
+          const targetSection = rowMid < boundary ? "sooner" : "later";
+
+          if (targetSection !== dragCtx.section) {
+            dragCtx.section = targetSection;
+            dragCtx.list = document.getElementById("list-" + targetSection);
+            const hint = dragCtx.list.querySelector(".empty-hint");
+            if (hint) hint.remove();
+            dragCtx.list.appendChild(dragCtx.placeholder);
+          }
+
+          const siblings = Array.from(dragCtx.list.children).filter(
+            (el) => el !== dragCtx.placeholder,
+          );
+          for (const sib of siblings) {
+            const sibRect = sib.getBoundingClientRect();
+            const sibMid = sibRect.top + sibRect.height / 2;
+            if (
+              rowMid < sibMid &&
+              dragCtx.placeholder.compareDocumentPosition(sib) &
+                Node.DOCUMENT_POSITION_PRECEDING
+            ) {
+              dragCtx.list.insertBefore(dragCtx.placeholder, sib);
+              break;
+            }
+            if (
+              rowMid > sibMid &&
+              dragCtx.placeholder.compareDocumentPosition(sib) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+            ) {
+              dragCtx.list.insertBefore(dragCtx.placeholder, sib.nextSibling);
+              break;
+            }
+          }
+        };
+
+        const finishDrag = () => {
+          if (!dragCtx) return;
+          dragCtx.item.section = dragCtx.section;
+          const finalOrder = Array.from(dragCtx.list.children).map(
+            (el) => el.dataset.id,
+          );
+          finalOrder.forEach((id, idx) => {
+            const tItem = state.todos.find((td) => td.id === id);
+            if (tItem) tItem.order = idx;
+          });
+
+          if (!dragCtx.wasExpandedSooner)
+            dragCtx.listSooner.classList.remove("expanded");
+          if (!dragCtx.wasExpandedLater)
+            dragCtx.listLater.classList.remove("expanded");
+          dragCtx.row.remove();
+          dragCtx.placeholder.remove();
+          document.body.style.overflow = "";
+          document.body.style.userSelect = "";
+
+          document.removeEventListener("pointermove", onMove);
+          document.removeEventListener("pointerup", finishDrag);
+          document.removeEventListener("pointercancel", finishDrag);
+          dragCtx = null;
+          saveState();
+          render();
+        };
+
+        document.addEventListener("pointermove", onMove, { passive: false });
+        document.addEventListener("pointerup", finishDrag);
+        document.addEventListener("pointercancel", finishDrag);
       }
 
       function completeItem(id, rowEl) {
