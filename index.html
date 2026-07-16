@@ -20,6 +20,7 @@
         --radius-card: 26px;
         --radius-row: 18px;
         --keyboard-inset: 0px;
+        --on-accent: #000;
       }
 
       [data-theme="light"] {
@@ -48,6 +49,11 @@
       [data-accent="white"] {
         --green: #f5f5f7;
         --green-dim: #c7c7cc;
+      }
+      [data-theme="light"][data-accent="white"] {
+        --green: #141416;
+        --green-dim: #3a3a3c;
+        --on-accent: #fff;
       }
       [data-accent="grey"] {
         --green: #9aa0a6;
@@ -246,7 +252,7 @@
       .checkbox svg {
         width: 15px;
         height: 15px;
-        color: #000;
+        color: var(--on-accent);
         opacity: 0;
         transition: opacity 0.1s ease;
       }
@@ -370,7 +376,7 @@
         height: 56px;
         border-radius: 50%;
         background: var(--green);
-        color: #000;
+        color: var(--on-accent);
       }
       .add-btn svg {
         width: 26px;
@@ -449,8 +455,8 @@
       }
       .segmented button {
         flex: 1;
-        padding: 10px;
-        border: none;
+        padding: 9px;
+        border: 2px solid transparent;
         background: transparent;
         color: var(--text-dim);
         border-radius: 9px;
@@ -459,8 +465,9 @@
         cursor: pointer;
       }
       .segmented button.active {
-        background: var(--green);
-        color: #000;
+        border-color: var(--green);
+        color: var(--green);
+        background: transparent;
       }
       .add-panel .actions {
         display: flex;
@@ -481,7 +488,7 @@
       }
       .actions .confirm {
         background: var(--green);
-        color: #000;
+        color: var(--on-accent);
       }
       .overlay {
         position: fixed;
@@ -1077,6 +1084,15 @@
             },
             {
               id: cryptoId(),
+              text: "Desktop tip: press + or Enter to add a task, Esc closes input fields",
+              section: "sooner",
+              done: false,
+              archived: false,
+              order: 4,
+              archivedAt: null,
+            },
+            {
+              id: cryptoId(),
               text: "Check out the archive and restore a task",
               section: "later",
               done: false,
@@ -1130,6 +1146,15 @@
             done: false,
             archived: false,
             order: 3,
+            archivedAt: null,
+          },
+          {
+            id: cryptoId(),
+            text: "Desktop-Tipp: + oder Enter fügt eine Aufgabe hinzu, Esc schließt Eingabefelder",
+            section: "sooner",
+            done: false,
+            archived: false,
+            order: 4,
             archivedAt: null,
           },
           {
@@ -1192,6 +1217,38 @@
               state.todos.forEach((tItem) => {
                 if (renameMap[tItem.text]) tItem.text = renameMap[tItem.text];
               });
+
+              const shortcutHintText =
+                LANG === "en"
+                  ? "Desktop tip: press + or Enter to add a task, Esc closes input fields"
+                  : "Desktop-Tipp: + oder Enter fügt eine Aufgabe hinzu, Esc schließt Eingabefelder";
+              const hasShortcutHint = state.todos.some(
+                (tItem) =>
+                  tItem.text ===
+                    "Desktop tip: press + or Enter to add a task, Esc closes input fields" ||
+                  tItem.text ===
+                    "Desktop-Tipp: + oder Enter fügt eine Aufgabe hinzu, Esc schließt Eingabefelder",
+              );
+              if (!hasShortcutHint) {
+                const maxOrder = Math.max(
+                  -1,
+                  ...state.todos
+                    .filter(
+                      (tItem) => tItem.section === "sooner" && !tItem.archived,
+                    )
+                    .map((tItem) => tItem.order),
+                );
+                state.todos.push({
+                  id: cryptoId(),
+                  text: shortcutHintText,
+                  section: "sooner",
+                  done: false,
+                  archived: false,
+                  order: maxOrder + 1,
+                  archivedAt: null,
+                });
+              }
+
               applySettingsToDom();
               render();
               return;
@@ -1243,20 +1300,26 @@
         { key: "blue", hex: "#3d8bff" },
         { key: "red", hex: "#ff453a" },
         { key: "orange", hex: "#ff9f0a" },
-        { key: "white", hex: "#f5f5f7" },
+        { key: "white", hex: "#f5f5f7", hexInLight: "#141416" },
         { key: "grey", hex: "#9aa0a6" },
       ];
       function renderAccentSwatches() {
         const wrap = document.getElementById("accentSwatches");
+        const isLight = state.settings.theme === "light";
         wrap.innerHTML = "";
         ACCENTS.forEach((a) => {
+          const useLightVariant = a.key === "white" && isLight;
+          const effectiveHex = useLightVariant ? a.hexInLight : a.hex;
+          const checkColor = useLightVariant ? "#fff" : "#000";
           const btn = document.createElement("button");
           btn.className =
             "swatch" + (state.settings.accent === a.key ? " active" : "");
-          btn.style.background = a.hex;
+          btn.style.background = effectiveHex;
           btn.title = a.key;
           btn.innerHTML =
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+            '<svg viewBox="0 0 24 24" fill="none" stroke="' +
+            checkColor +
+            '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
           btn.addEventListener("click", () => {
             state.settings.accent = a.key;
             applySettingsToDom();
@@ -1872,12 +1935,16 @@
       });
 
       document.addEventListener("keydown", (e) => {
-        if (
-          (e.key === "Escape" || e.keyCode === 27) &&
-          addPanel.classList.contains("open")
-        ) {
+        if (e.key !== "Escape" && e.keyCode !== 27) return;
+        if (addPanel.classList.contains("open")) {
           e.preventDefault();
           closeAddPanel();
+        } else if (archivePanel.classList.contains("open")) {
+          e.preventDefault();
+          closeArchivePanel();
+        } else if (settingsPanel.classList.contains("open")) {
+          e.preventDefault();
+          closeSettingsPanel();
         }
       });
 
