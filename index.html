@@ -708,8 +708,14 @@
       .row-main .row-text {
         flex: none;
       }
-      .project-badge {
+      .badge-row {
+        display: flex;
+        flex-wrap: wrap;
         align-self: flex-start;
+        gap: 6px;
+        max-width: 100%;
+      }
+      .project-badge {
         font-size: 11px;
         font-weight: 600;
         color: var(--green);
@@ -721,6 +727,24 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+      .date-badge {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: 999px;
+        cursor: pointer;
+        white-space: nowrap;
+        background: var(--row-border);
+        color: var(--text-dim);
+      }
+      .date-badge.today {
+        background: var(--green);
+        color: var(--on-accent);
+      }
+      .date-badge.overdue {
+        background: rgba(255, 107, 94, 0.15);
+        color: var(--danger);
       }
 
       #appTitle.clickable {
@@ -1056,6 +1080,22 @@
           <button class="switch" id="hideProjectTasksSwitch"></button>
         </div>
       </div>
+
+      <div class="settings-section" id="dateSettingsSection">
+        <h3 id="dateSectionLabel">Datum</h3>
+        <div class="settings-row">
+          <div>
+            <div class="settings-label" id="dateRecognitionLabel">
+              Datumserkennung verwenden
+            </div>
+            <div class="settings-hint" id="dateRecognitionHint">
+              Erkennt Formulierungen wie „morgen“ oder „nächsten Dienstag“
+              beim Tippen automatisch als Fälligkeitsdatum.
+            </div>
+          </div>
+          <button class="switch" id="dateRecognitionSwitch"></button>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -1111,10 +1151,15 @@
             "Zeigt die App wie gewohnt, ohne Projekte und Zusatzfunktionen.",
           allProjectsLabel: "Alle",
           removeProjectTitle: "Projekt entfernen",
+          removeDateTitle: "Datum entfernen",
           projectsSectionLabel: "Projekte",
           hideProjectTasksLabel: "Projekt-Aufgaben vom Hauptbildschirm ausblenden",
           hideProjectTasksHint:
             "Aufgaben mit einem Projekt erscheinen dann nur noch in ihrer Projekt-Ansicht, nicht mehr unter „Alle“.",
+          dateSectionLabel: "Datum",
+          dateRecognitionLabel: "Datumserkennung verwenden",
+          dateRecognitionHint:
+            "Erkennt Formulierungen wie „morgen“ oder „nächsten Dienstag“ beim Tippen automatisch als Fälligkeitsdatum.",
         },
         en: {
           appTitle: "TwoDo-List",
@@ -1157,10 +1202,15 @@
           minimalModeHint: "Shows the app as usual, without projects and extras.",
           allProjectsLabel: "All",
           removeProjectTitle: "Remove project",
+          removeDateTitle: "Remove date",
           projectsSectionLabel: "Projects",
           hideProjectTasksLabel: "Hide project tasks from home",
           hideProjectTasksHint:
             "Tasks with a project only show up in their project view, not under \"All\" anymore.",
+          dateSectionLabel: "Date",
+          dateRecognitionLabel: "Use date recognition",
+          dateRecognitionHint:
+            "Recognizes phrases like \"tomorrow\" or \"next Tuesday\" while typing and turns them into a due date.",
         },
       };
       function t(key) {
@@ -1207,6 +1257,15 @@
         );
         document.getElementById("hideProjectTasksHint").textContent = t(
           "hideProjectTasksHint",
+        );
+        document.getElementById("dateSectionLabel").textContent = t(
+          "dateSectionLabel",
+        );
+        document.getElementById("dateRecognitionLabel").textContent = t(
+          "dateRecognitionLabel",
+        );
+        document.getElementById("dateRecognitionHint").textContent = t(
+          "dateRecognitionHint",
         );
         document
           .querySelectorAll(".expand-btn")
@@ -1255,6 +1314,7 @@
           accent: "green",
           archiveEnabled: true,
           hideProjectTasksFromHome: false,
+          dateRecognitionEnabled: true,
         },
       };
       let newTodoTarget = "sooner";
@@ -1286,6 +1346,10 @@
         return state.settings.minimalMode === true;
       }
 
+      function isDateRecognitionEnabled() {
+        return !isMinimal() && state.settings.dateRecognitionEnabled !== false;
+      }
+
       function extractProjectTag(text) {
         const match = text.match(/#([^\s#]+)/);
         if (!match) return { cleanText: text.trim(), project: null };
@@ -1306,9 +1370,161 @@
         return Array.from(set).sort((a, b) => a.localeCompare(b));
       }
 
-      const defaultTodos = () => {
+      /* ---------- Date recognition ---------- */
+      function startOfDay(d) {
+        const nd = new Date(d);
+        nd.setHours(0, 0, 0, 0);
+        return nd;
+      }
+      function addDays(d, n) {
+        const nd = new Date(d);
+        nd.setDate(nd.getDate() + n);
+        return nd;
+      }
+      function formatISODate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return y + "-" + m + "-" + day;
+      }
+      function nextWeekday(targetDow) {
+        const today = startOfDay(new Date());
+        const diff = (targetDow - today.getDay() + 7) % 7;
+        return addDays(today, diff);
+      }
+
+      // Recognizes a constrained set of German/English date phrases
+      // (weekdays, heute/today, morgen/tomorrow, "in 3 Tagen"/"in 3 days",
+      // and DD.MM.(YYYY) dates) rather than attempting full free-text NLP.
+      function parseDatePhrase(text) {
+        const lower = text.toLowerCase();
+        const candidates = [];
+
+        function tryMatch(regex, resolve) {
+          const m = lower.match(regex);
+          if (!m) return;
+          const date = resolve(m);
+          if (date) candidates.push({ index: m.index, length: m[0].length, date });
+        }
+
+        tryMatch(/\b(\d{1,2})\.(\d{1,2})\.(?:(\d{4})\b|(?!\d))/, (m) => {
+          const day = parseInt(m[1], 10);
+          const month = parseInt(m[2], 10);
+          if (day < 1 || day > 31 || month < 1 || month > 12) return null;
+          const explicitYear = m[3] ? parseInt(m[3], 10) : null;
+          const year = explicitYear || new Date().getFullYear();
+          let d = new Date(year, month - 1, day);
+          if (d.getMonth() !== month - 1) return null;
+          if (!explicitYear && startOfDay(d) < startOfDay(new Date())) {
+            d = new Date(year + 1, month - 1, day);
+          }
+          return d;
+        });
+
+        // Leading \b breaks on "ü", so this one needs an explicit lookbehind.
+        tryMatch(/(?<![a-zA-ZäöüÄÖÜß])übermorgen\b/, () =>
+          addDays(startOfDay(new Date()), 2),
+        );
+        tryMatch(/\bday after tomorrow\b/, () =>
+          addDays(startOfDay(new Date()), 2),
+        );
+        tryMatch(/\bmorgen\b/, () => addDays(startOfDay(new Date()), 1));
+        tryMatch(/\btomorrow\b/, () => addDays(startOfDay(new Date()), 1));
+        tryMatch(/\bheute\b/, () => startOfDay(new Date()));
+        tryMatch(/\btoday\b/, () => startOfDay(new Date()));
+
+        tryMatch(/\bin\s+(\d+)\s+wochen?\b/, (m) =>
+          addDays(startOfDay(new Date()), parseInt(m[1], 10) * 7),
+        );
+        tryMatch(/\bin\s+(\d+)\s+weeks?\b/, (m) =>
+          addDays(startOfDay(new Date()), parseInt(m[1], 10) * 7),
+        );
+        tryMatch(/\bin\s+(\d+)\s+tage?n?\b/, (m) =>
+          addDays(startOfDay(new Date()), parseInt(m[1], 10)),
+        );
+        tryMatch(/\bin\s+(\d+)\s+days?\b/, (m) =>
+          addDays(startOfDay(new Date()), parseInt(m[1], 10)),
+        );
+
+        const weekdayDe = [
+          "sonntag",
+          "montag",
+          "dienstag",
+          "mittwoch",
+          "donnerstag",
+          "freitag",
+          "samstag",
+        ];
+        tryMatch(
+          /\b(?:nächsten|kommenden|diesen)\s+(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b/,
+          (m) => nextWeekday(weekdayDe.indexOf(m[1])),
+        );
+        tryMatch(
+          /\b(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)\b/,
+          (m) => nextWeekday(weekdayDe.indexOf(m[1])),
+        );
+
+        const weekdayEn = [
+          "sunday",
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+        ];
+        tryMatch(
+          /\b(?:next|this)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/,
+          (m) => nextWeekday(weekdayEn.indexOf(m[1])),
+        );
+        tryMatch(
+          /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/,
+          (m) => nextWeekday(weekdayEn.indexOf(m[1])),
+        );
+
+        if (candidates.length === 0) return null;
+        candidates.sort((a, b) => a.index - b.index || b.length - a.length);
+        return candidates[0];
+      }
+
+      function extractDateTag(text) {
+        const match = parseDatePhrase(text);
+        if (!match) return { cleanText: text.trim(), dueDate: null };
+        const cleanText = (
+          text.slice(0, match.index) + text.slice(match.index + match.length)
+        )
+          .replace(/\s+/g, " ")
+          .trim();
+        return { cleanText, dueDate: formatISODate(match.date) };
+      }
+
+      function formatDueDate(iso) {
+        const d = new Date(iso + "T00:00:00");
+        const weekdayNames =
+          LANG === "en"
+            ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+            : ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = String(d.getMonth() + 1).padStart(2, "0");
         if (LANG === "en") {
-          return [
+          return weekdayNames[d.getDay()] + ", " + month + "/" + day;
+        }
+        return weekdayNames[d.getDay()] + ", " + day + "." + month + ".";
+      }
+
+      function dueDateStatus(iso) {
+        const today = formatISODate(startOfDay(new Date()));
+        if (iso === today) return "today";
+        if (iso < today) return "overdue";
+        return "upcoming";
+      }
+
+      const defaultTodos = () => {
+        const showFeatureExamples = !isMinimal();
+        const showDateExample = isDateRecognitionEnabled();
+        const exampleDueDate = formatISODate(addDays(startOfDay(new Date()), 1));
+        if (LANG === "en") {
+          const list = [
             {
               id: cryptoId(),
               text: "Check me off – I\u2019ll move to the archive automatically",
@@ -1373,8 +1589,33 @@
               archivedAt: Date.now() - 60000,
             },
           ];
+          if (showFeatureExamples) {
+            list.push({
+              id: cryptoId(),
+              text: 'I belong to the project "Example" – tap "TwoDo-List" above to filter by project',
+              section: "sooner",
+              done: false,
+              archived: false,
+              order: 5,
+              archivedAt: null,
+              project: "Example",
+            });
+          }
+          if (showDateExample) {
+            list.push({
+              id: cryptoId(),
+              text: 'I have a date – just type "tomorrow" or a weekday into the text',
+              section: "sooner",
+              done: false,
+              archived: false,
+              order: 6,
+              archivedAt: null,
+              dueDate: exampleDueDate,
+            });
+          }
+          return list;
         }
-        return [
+        const list = [
           {
             id: cryptoId(),
             text: "Hake mich ab – ich wandere danach automatisch ins Archiv",
@@ -1439,6 +1680,31 @@
             archivedAt: Date.now() - 60000,
           },
         ];
+        if (showFeatureExamples) {
+          list.push({
+            id: cryptoId(),
+            text: 'Ich gehöre zum Projekt "Beispiel" – tippe oben auf "TwoDo-List", um nach Projekten zu filtern',
+            section: "sooner",
+            done: false,
+            archived: false,
+            order: 5,
+            archivedAt: null,
+            project: "Beispiel",
+          });
+        }
+        if (showDateExample) {
+          list.push({
+            id: cryptoId(),
+            text: 'Ich habe ein Datum – tippe einfach "morgen" oder einen Wochentag in den Text',
+            section: "sooner",
+            done: false,
+            archived: false,
+            order: 6,
+            archivedAt: null,
+            dueDate: exampleDueDate,
+          });
+        }
+        return list;
       };
 
       function loadState() {
@@ -1456,6 +1722,7 @@
                     accent: "green",
                     archiveEnabled: true,
                     hideProjectTasksFromHome: false,
+                    dateRecognitionEnabled: true,
                   },
                   parsed.settings || {},
                 ),
@@ -1468,6 +1735,8 @@
                   tItem.archivedAt = null;
                 if (typeof tItem.project === "undefined")
                   tItem.project = null;
+                if (typeof tItem.dueDate === "undefined")
+                  tItem.dueDate = null;
               });
               if (typeof state.settings.minimalMode !== "boolean") {
                 state.settings.minimalMode = detectMobileDefault();
@@ -1533,13 +1802,21 @@
             e,
           );
         }
-        state.todos = defaultTodos();
-        state.todos.forEach((tItem) => (tItem.project = null));
         if (typeof state.settings.minimalMode !== "boolean") {
           state.settings.minimalMode = detectMobileDefault();
         }
+        state.todos = defaultTodos();
+        state.todos.forEach((tItem) => {
+          if (typeof tItem.project === "undefined") tItem.project = null;
+          if (typeof tItem.dueDate === "undefined") tItem.dueDate = null;
+        });
         applySettingsToDom();
         render();
+        if (!isMinimal() && getActiveProjects().length > 0) {
+          document.getElementById("projectTabs").classList.add("open");
+          document.getElementById("appTitle").classList.add("tabs-open");
+          projectTabsAutoOpened = true;
+        }
         saveState();
       }
 
@@ -1604,6 +1881,16 @@
           .classList.toggle(
             "on",
             state.settings.hideProjectTasksFromHome === true,
+          );
+
+        document
+          .getElementById("dateSettingsSection")
+          .classList.toggle("hidden", isMinimal());
+        document
+          .getElementById("dateRecognitionSwitch")
+          .classList.toggle(
+            "on",
+            state.settings.dateRecognitionEnabled !== false,
           );
       }
 
@@ -1767,19 +2054,39 @@
         const rowMain = document.createElement("div");
         rowMain.className = "row-main";
         rowMain.appendChild(text);
+
+        const badgesWrap = document.createElement("div");
+        badgesWrap.className = "badge-row";
+        let hasBadges = false;
         if (!isMinimal() && item.project) {
-          const badge = document.createElement("div");
-          badge.className = "project-badge";
-          badge.textContent = "#" + item.project;
-          badge.title = t("removeProjectTitle");
-          badge.addEventListener("click", (e) => {
+          const projectBadge = document.createElement("div");
+          projectBadge.className = "project-badge";
+          projectBadge.textContent = "#" + item.project;
+          projectBadge.title = t("removeProjectTitle");
+          projectBadge.addEventListener("click", (e) => {
             e.stopPropagation();
             item.project = null;
             saveState();
             render();
           });
-          rowMain.appendChild(badge);
+          badgesWrap.appendChild(projectBadge);
+          hasBadges = true;
         }
+        if (isDateRecognitionEnabled() && item.dueDate) {
+          const dateBadge = document.createElement("div");
+          dateBadge.className = "date-badge " + dueDateStatus(item.dueDate);
+          dateBadge.textContent = formatDueDate(item.dueDate);
+          dateBadge.title = t("removeDateTitle");
+          dateBadge.addEventListener("click", (e) => {
+            e.stopPropagation();
+            item.dueDate = null;
+            saveState();
+            render();
+          });
+          badgesWrap.appendChild(dateBadge);
+          hasBadges = true;
+        }
+        if (hasBadges) rowMain.appendChild(badgesWrap);
 
         const dragHandle = document.createElement("button");
         dragHandle.className = "drag-handle";
@@ -1966,10 +2273,21 @@
           const newText = input.value.trim();
           if (commit && newText) {
             if (!isMinimal()) {
-              const extracted = extractProjectTag(newText);
-              if (extracted.cleanText) {
-                item.text = extracted.cleanText;
-                item.project = extracted.project;
+              const extractedProject = extractProjectTag(newText);
+              if (extractedProject.cleanText) {
+                item.text = extractedProject.cleanText;
+                item.project = extractedProject.project;
+                if (isDateRecognitionEnabled()) {
+                  const extractedDate = extractDateTag(
+                    extractedProject.cleanText,
+                  );
+                  if (extractedDate.cleanText) {
+                    item.text = extractedDate.cleanText;
+                  }
+                  if (extractedDate.dueDate) {
+                    item.dueDate = extractedDate.dueDate;
+                  }
+                }
               }
             } else {
               item.text = newText;
@@ -2184,11 +2502,19 @@
         if (!raw) return;
         let clean = raw;
         let project = null;
+        let dueDate = null;
         if (!isMinimal()) {
-          const extracted = extractProjectTag(raw);
-          if (extracted.cleanText) {
-            clean = extracted.cleanText;
-            project = extracted.project;
+          const extractedProject = extractProjectTag(raw);
+          if (extractedProject.cleanText) {
+            clean = extractedProject.cleanText;
+            project = extractedProject.project;
+          }
+          if (isDateRecognitionEnabled()) {
+            const extractedDate = extractDateTag(clean);
+            if (extractedDate.cleanText) {
+              clean = extractedDate.cleanText;
+              dueDate = extractedDate.dueDate;
+            }
           }
         }
         if (!clean) return;
@@ -2207,6 +2533,7 @@
           order: maxOrder + 1,
           archivedAt: null,
           project,
+          dueDate,
         });
         state.expanded[section] = true;
         render();
@@ -2468,6 +2795,16 @@
         .addEventListener("click", () => {
           state.settings.hideProjectTasksFromHome =
             state.settings.hideProjectTasksFromHome !== true;
+          applySettingsToDom();
+          render();
+          saveState();
+        });
+
+      document
+        .getElementById("dateRecognitionSwitch")
+        .addEventListener("click", () => {
+          state.settings.dateRecognitionEnabled =
+            state.settings.dateRecognitionEnabled === false ? true : false;
           applySettingsToDom();
           render();
           saveState();
