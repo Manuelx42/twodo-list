@@ -610,6 +610,26 @@
         color: var(--text);
       }
 
+      .privacy-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: 12.5px;
+        line-height: 1.45;
+        color: var(--text-dim);
+        background: var(--row);
+        border: 1px solid var(--row-border);
+        border-radius: 14px;
+        padding: 12px 14px;
+        margin-bottom: 20px;
+      }
+      .privacy-note svg {
+        width: 17px;
+        height: 17px;
+        flex-shrink: 0;
+        margin-top: 1px;
+        color: var(--green);
+      }
       .settings-section {
         margin-bottom: 22px;
       }
@@ -1023,6 +1043,24 @@
         <button class="panel-close" id="closeSettingsBtn">✕</button>
       </div>
 
+      <div class="privacy-note">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="4" y="11" width="16" height="10" rx="2.5" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+        <span id="privacyNoteText"
+          >Alle Daten bleiben privat – sie werden ausschließlich lokal in
+          diesem Browser gespeichert, nie an einen Server gesendet.</span
+        >
+      </div>
+
       <div class="settings-section">
         <h3 id="appearanceLabel">Darstellung</h3>
         <div class="settings-row">
@@ -1069,15 +1107,15 @@
         <h3 id="projectsSectionLabel">Projekte</h3>
         <div class="settings-row">
           <div>
-            <div class="settings-label" id="hideProjectTasksLabel">
-              Projekt-Aufgaben vom Hauptbildschirm ausblenden
+            <div class="settings-label" id="showProjectTasksLabel">
+              Projekt-Aufgaben auf dem Hauptbildschirm anzeigen
             </div>
-            <div class="settings-hint" id="hideProjectTasksHint">
-              Aufgaben mit einem Projekt erscheinen dann nur noch in ihrer
-              Projekt-Ansicht, nicht mehr unter „Alle“.
+            <div class="settings-hint" id="showProjectTasksHint">
+              Wenn deaktiviert, erscheinen Aufgaben mit einem Projekt nur noch
+              in ihrer Projekt-Ansicht, nicht mehr unter „Alle“.
             </div>
           </div>
-          <button class="switch" id="hideProjectTasksSwitch"></button>
+          <button class="switch" id="showProjectTasksSwitch"></button>
         </div>
       </div>
 
@@ -1153,13 +1191,15 @@
           removeProjectTitle: "Projekt entfernen",
           removeDateTitle: "Datum entfernen",
           projectsSectionLabel: "Projekte",
-          hideProjectTasksLabel: "Projekt-Aufgaben vom Hauptbildschirm ausblenden",
-          hideProjectTasksHint:
-            "Aufgaben mit einem Projekt erscheinen dann nur noch in ihrer Projekt-Ansicht, nicht mehr unter „Alle“.",
+          showProjectTasksLabel: "Projekt-Aufgaben auf dem Hauptbildschirm anzeigen",
+          showProjectTasksHint:
+            "Wenn deaktiviert, erscheinen Aufgaben mit einem Projekt nur noch in ihrer Projekt-Ansicht, nicht mehr unter „Alle“.",
           dateSectionLabel: "Datum",
           dateRecognitionLabel: "Datumserkennung verwenden",
           dateRecognitionHint:
             "Erkennt Formulierungen wie „morgen“ oder „nächsten Dienstag“ beim Tippen automatisch als Fälligkeitsdatum.",
+          privacyNoteText:
+            "Alle Daten bleiben privat – sie werden ausschließlich lokal in diesem Browser gespeichert, nie an einen Server gesendet.",
         },
         en: {
           appTitle: "TwoDo-List",
@@ -1204,13 +1244,15 @@
           removeProjectTitle: "Remove project",
           removeDateTitle: "Remove date",
           projectsSectionLabel: "Projects",
-          hideProjectTasksLabel: "Hide project tasks from home",
-          hideProjectTasksHint:
-            "Tasks with a project only show up in their project view, not under \"All\" anymore.",
+          showProjectTasksLabel: "Show project tasks on home",
+          showProjectTasksHint:
+            "When off, tasks with a project only show up in their project view, not under \"All\" anymore.",
           dateSectionLabel: "Date",
           dateRecognitionLabel: "Use date recognition",
           dateRecognitionHint:
             "Recognizes phrases like \"tomorrow\" or \"next Tuesday\" while typing and turns them into a due date.",
+          privacyNoteText:
+            "All data stays private – it's stored locally in this browser only and never sent to a server.",
         },
       };
       function t(key) {
@@ -1252,11 +1294,11 @@
         document.getElementById("projectsSectionLabel").textContent = t(
           "projectsSectionLabel",
         );
-        document.getElementById("hideProjectTasksLabel").textContent = t(
-          "hideProjectTasksLabel",
+        document.getElementById("showProjectTasksLabel").textContent = t(
+          "showProjectTasksLabel",
         );
-        document.getElementById("hideProjectTasksHint").textContent = t(
-          "hideProjectTasksHint",
+        document.getElementById("showProjectTasksHint").textContent = t(
+          "showProjectTasksHint",
         );
         document.getElementById("dateSectionLabel").textContent = t(
           "dateSectionLabel",
@@ -1266,6 +1308,9 @@
         );
         document.getElementById("dateRecognitionHint").textContent = t(
           "dateRecognitionHint",
+        );
+        document.getElementById("privacyNoteText").textContent = t(
+          "privacyNoteText",
         );
         document
           .querySelectorAll(".expand-btn")
@@ -1313,7 +1358,7 @@
           theme: "dark",
           accent: "green",
           archiveEnabled: true,
-          hideProjectTasksFromHome: false,
+          showProjectTasksOnHome: true,
           dateRecognitionEnabled: true,
         },
       };
@@ -1340,6 +1385,18 @@
         } catch (e) {
           return false;
         }
+      }
+
+      function detectPreferredTheme() {
+        try {
+          if (
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: light)").matches
+          ) {
+            return "light";
+          }
+        } catch (e) {}
+        return "dark";
       }
 
       function isMinimal() {
@@ -1721,12 +1778,21 @@
                     theme: "dark",
                     accent: "green",
                     archiveEnabled: true,
-                    hideProjectTasksFromHome: false,
+                    showProjectTasksOnHome: true,
                     dateRecognitionEnabled: true,
                   },
                   parsed.settings || {},
                 ),
               };
+              // Migrate the old inverted "hideProjectTasksFromHome" flag.
+              if (
+                parsed.settings &&
+                typeof parsed.settings.showProjectTasksOnHome === "undefined" &&
+                typeof parsed.settings.hideProjectTasksFromHome === "boolean"
+              ) {
+                state.settings.showProjectTasksOnHome =
+                  !parsed.settings.hideProjectTasksFromHome;
+              }
               state.todos.forEach((tItem, i) => {
                 if (typeof tItem.archived === "undefined")
                   tItem.archived = !!tItem.done;
@@ -1805,6 +1871,7 @@
         if (typeof state.settings.minimalMode !== "boolean") {
           state.settings.minimalMode = detectMobileDefault();
         }
+        state.settings.theme = detectPreferredTheme();
         state.todos = defaultTodos();
         state.todos.forEach((tItem) => {
           if (typeof tItem.project === "undefined") tItem.project = null;
@@ -1877,10 +1944,10 @@
           .getElementById("projectsSettingsSection")
           .classList.toggle("hidden", isMinimal());
         document
-          .getElementById("hideProjectTasksSwitch")
+          .getElementById("showProjectTasksSwitch")
           .classList.toggle(
             "on",
-            state.settings.hideProjectTasksFromHome === true,
+            state.settings.showProjectTasksOnHome !== false,
           );
 
         document
@@ -1933,7 +2000,7 @@
         if (currentProjectFilter !== "all") {
           return tItem.project === currentProjectFilter;
         }
-        if (state.settings.hideProjectTasksFromHome && tItem.project) {
+        if (state.settings.showProjectTasksOnHome === false && tItem.project) {
           return false;
         }
         return true;
@@ -2791,10 +2858,10 @@
       });
 
       document
-        .getElementById("hideProjectTasksSwitch")
+        .getElementById("showProjectTasksSwitch")
         .addEventListener("click", () => {
-          state.settings.hideProjectTasksFromHome =
-            state.settings.hideProjectTasksFromHome !== true;
+          state.settings.showProjectTasksOnHome =
+            state.settings.showProjectTasksOnHome === false ? true : false;
           applySettingsToDom();
           render();
           saveState();
