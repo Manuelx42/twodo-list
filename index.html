@@ -613,6 +613,9 @@
       .settings-section {
         margin-bottom: 22px;
       }
+      .settings-section.hidden {
+        display: none;
+      }
       .settings-section h3 {
         font-size: 13px;
         text-transform: uppercase;
@@ -694,14 +697,158 @@
       .swatch.active svg {
         opacity: 1;
       }
+
+      .row-main {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        flex: 1;
+        min-width: 0;
+      }
+      .row-main .row-text {
+        flex: none;
+      }
+      .project-badge {
+        align-self: flex-start;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--green);
+        background: var(--row-border);
+        padding: 3px 9px;
+        border-radius: 999px;
+        cursor: pointer;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      #appTitle.clickable {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #appTitle .title-chevron {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        background: var(--row-border);
+        color: var(--green);
+        transition:
+          transform 0.25s ease,
+          background 0.15s ease;
+      }
+      #appTitle .title-chevron svg {
+        width: 17px;
+        height: 17px;
+      }
+      #appTitle.clickable .title-chevron {
+        display: inline-flex;
+      }
+      #appTitle.clickable:hover .title-chevron {
+        background: var(--green);
+        color: var(--on-accent);
+      }
+      #appTitle.clickable.tabs-open .title-chevron {
+        transform: rotate(180deg);
+      }
+
+      .project-tabs {
+        display: none;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 0 6px 18px;
+        scrollbar-width: none;
+      }
+      .project-tabs::-webkit-scrollbar {
+        display: none;
+      }
+      .project-tabs.open {
+        display: flex;
+      }
+      .project-tab {
+        flex-shrink: 0;
+        padding: 8px 14px;
+        border: 1px solid var(--row-border);
+        border-radius: 999px;
+        background: var(--card);
+        color: var(--text-dim);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .project-tab.active {
+        border-color: var(--green);
+        color: var(--green);
+      }
+
+      .project-suggest {
+        position: fixed;
+        display: none;
+        flex-direction: column;
+        gap: 4px;
+        background: var(--card);
+        border: 1px solid var(--row-border);
+        border-radius: 16px;
+        padding: 6px;
+        max-height: 240px;
+        overflow-y: auto;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        z-index: 20;
+      }
+      .project-suggest.open {
+        display: flex;
+      }
+      .project-chip {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: none;
+        background: transparent;
+        color: var(--green);
+        font-size: 14px;
+        font-weight: 600;
+        padding: 11px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      .project-chip:hover,
+      .project-chip:active {
+        background: var(--row);
+      }
+      .project-chip.selected {
+        background: var(--green);
+        color: var(--on-accent);
+      }
     </style>
   </head>
   <body>
     <div id="app">
       <div class="topbar">
-        <h1 id="appTitle">TwoDo-List</h1>
+        <h1 id="appTitle">
+          <span id="appTitleText">TwoDo-List</span
+          ><span class="title-chevron">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg> </span
+          >
+        </h1>
         <div class="total-pill" id="totalPill">–</div>
       </div>
+
+      <div class="project-tabs" id="projectTabs"></div>
 
       <div class="section" id="section-sooner">
         <div class="section-header">
@@ -878,6 +1025,37 @@
           <button class="switch" id="archiveSwitch"></button>
         </div>
       </div>
+
+      <div class="settings-section">
+        <h3 id="modeSectionLabel">Modus</h3>
+        <div class="settings-row">
+          <div>
+            <div class="settings-label" id="minimalModeLabel">
+              Minimalistischer Modus
+            </div>
+            <div class="settings-hint" id="minimalModeHint">
+              Zeigt die App wie gewohnt, ohne Projekte und Zusatzfunktionen.
+            </div>
+          </div>
+          <button class="switch" id="minimalSwitch"></button>
+        </div>
+      </div>
+
+      <div class="settings-section" id="projectsSettingsSection">
+        <h3 id="projectsSectionLabel">Projekte</h3>
+        <div class="settings-row">
+          <div>
+            <div class="settings-label" id="hideProjectTasksLabel">
+              Projekt-Aufgaben vom Hauptbildschirm ausblenden
+            </div>
+            <div class="settings-hint" id="hideProjectTasksHint">
+              Aufgaben mit einem Projekt erscheinen dann nur noch in ihrer
+              Projekt-Ansicht, nicht mehr unter „Alle“.
+            </div>
+          </div>
+          <button class="switch" id="hideProjectTasksSwitch"></button>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -927,6 +1105,16 @@
           expandTitle: "Alle anzeigen / einklappen",
           editHint: "Zum Bearbeiten antippen",
           dragHandleTitle: "Ziehen zum Sortieren",
+          modeSectionLabel: "Modus",
+          minimalModeLabel: "Minimalistischer Modus",
+          minimalModeHint:
+            "Zeigt die App wie gewohnt, ohne Projekte und Zusatzfunktionen.",
+          allProjectsLabel: "Alle",
+          removeProjectTitle: "Projekt entfernen",
+          projectsSectionLabel: "Projekte",
+          hideProjectTasksLabel: "Projekt-Aufgaben vom Hauptbildschirm ausblenden",
+          hideProjectTasksHint:
+            "Aufgaben mit einem Projekt erscheinen dann nur noch in ihrer Projekt-Ansicht, nicht mehr unter „Alle“.",
         },
         en: {
           appTitle: "TwoDo-List",
@@ -964,6 +1152,15 @@
           expandTitle: "Show all / collapse",
           editHint: "Tap to edit",
           dragHandleTitle: "Drag to reorder",
+          modeSectionLabel: "Mode",
+          minimalModeLabel: "Minimalist mode",
+          minimalModeHint: "Shows the app as usual, without projects and extras.",
+          allProjectsLabel: "All",
+          removeProjectTitle: "Remove project",
+          projectsSectionLabel: "Projects",
+          hideProjectTasksLabel: "Hide project tasks from home",
+          hideProjectTasksHint:
+            "Tasks with a project only show up in their project view, not under \"All\" anymore.",
         },
       };
       function t(key) {
@@ -972,7 +1169,7 @@
 
       function applyStaticTranslations() {
         document.title = t("appTitle");
-        document.getElementById("appTitle").textContent = t("appTitle");
+        document.getElementById("appTitleText").textContent = t("appTitle");
         document.getElementById("newTodoText").placeholder =
           t("newTodoPlaceholder");
         document.getElementById("addPanelTitle").textContent =
@@ -996,6 +1193,21 @@
           t("archiveToggleLabel");
         document.getElementById("archiveToggleHint").textContent =
           t("archiveToggleHint");
+        document.getElementById("modeSectionLabel").textContent =
+          t("modeSectionLabel");
+        document.getElementById("minimalModeLabel").textContent =
+          t("minimalModeLabel");
+        document.getElementById("minimalModeHint").textContent =
+          t("minimalModeHint");
+        document.getElementById("projectsSectionLabel").textContent = t(
+          "projectsSectionLabel",
+        );
+        document.getElementById("hideProjectTasksLabel").textContent = t(
+          "hideProjectTasksLabel",
+        );
+        document.getElementById("hideProjectTasksHint").textContent = t(
+          "hideProjectTasksHint",
+        );
         document
           .querySelectorAll(".expand-btn")
           .forEach((b) => (b.title = t("expandTitle")));
@@ -1031,9 +1243,17 @@
       let state = {
         todos: [],
         expanded: { sooner: false, later: false },
-        settings: { theme: "dark", accent: "green", archiveEnabled: true },
+        settings: {
+          theme: "dark",
+          accent: "green",
+          archiveEnabled: true,
+          hideProjectTasksFromHome: false,
+        },
       };
       let newTodoTarget = "sooner";
+      let currentProjectFilter = "all";
+      let lastActiveProjectCount = null;
+      let projectTabsAutoOpened = false;
 
       function cryptoId() {
         return (
@@ -1041,6 +1261,42 @@
           Math.random().toString(36).slice(2, 10) +
           Date.now().toString(36)
         );
+      }
+
+      function detectMobileDefault() {
+        try {
+          return (
+            (window.matchMedia &&
+              window.matchMedia("(pointer: coarse)").matches) ||
+            window.innerWidth <= 700
+          );
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function isMinimal() {
+        return state.settings.minimalMode === true;
+      }
+
+      function extractProjectTag(text) {
+        const match = text.match(/#([^\s#]+)/);
+        if (!match) return { cleanText: text.trim(), project: null };
+        const cleanText = (
+          text.slice(0, match.index) +
+          text.slice(match.index + match[0].length)
+        )
+          .replace(/\s+/g, " ")
+          .trim();
+        return { cleanText, project: match[1] };
+      }
+
+      function getActiveProjects() {
+        const set = new Set();
+        state.todos.forEach((tItem) => {
+          if (!tItem.archived && tItem.project) set.add(tItem.project);
+        });
+        return Array.from(set).sort((a, b) => a.localeCompare(b));
       }
 
       const defaultTodos = () => {
@@ -1188,7 +1444,12 @@
                 todos: parsed.todos,
                 expanded: parsed.expanded || { sooner: false, later: false },
                 settings: Object.assign(
-                  { theme: "dark", accent: "green", archiveEnabled: true },
+                  {
+                    theme: "dark",
+                    accent: "green",
+                    archiveEnabled: true,
+                    hideProjectTasksFromHome: false,
+                  },
                   parsed.settings || {},
                 ),
               };
@@ -1198,7 +1459,12 @@
                 if (typeof tItem.order === "undefined") tItem.order = i;
                 if (typeof tItem.archivedAt === "undefined")
                   tItem.archivedAt = null;
+                if (typeof tItem.project === "undefined")
+                  tItem.project = null;
               });
+              if (typeof state.settings.minimalMode !== "boolean") {
+                state.settings.minimalMode = detectMobileDefault();
+              }
               const obsoleteTexts = [
                 "Bring mich mit den Pfeilen \u25B2\u25BC oder per Ziehen an eine andere Stelle",
                 "...oder verschiebe mich, um die Reihenfolge zu testen",
@@ -1261,9 +1527,27 @@
           );
         }
         state.todos = defaultTodos();
+        state.todos.forEach((tItem) => (tItem.project = null));
+        if (typeof state.settings.minimalMode !== "boolean") {
+          state.settings.minimalMode = detectMobileDefault();
+        }
         applySettingsToDom();
         render();
         saveState();
+      }
+
+      function maybeAutoOpenProjectTabs() {
+        const count = getActiveProjects().length;
+        if (lastActiveProjectCount === null) {
+          lastActiveProjectCount = count;
+          return;
+        }
+        if (!projectTabsAutoOpened && lastActiveProjectCount === 0 && count > 0) {
+          document.getElementById("projectTabs").classList.add("open");
+          document.getElementById("appTitle").classList.add("tabs-open");
+          projectTabsAutoOpened = true;
+        }
+        lastActiveProjectCount = count;
       }
 
       function saveState() {
@@ -1293,6 +1577,27 @@
           .getElementById("openArchiveBtn")
           .classList.toggle("hidden", state.settings.archiveEnabled === false);
         renderAccentSwatches();
+
+        document
+          .getElementById("minimalSwitch")
+          .classList.toggle("on", isMinimal());
+        const titleEl = document.getElementById("appTitle");
+        titleEl.classList.toggle("clickable", !isMinimal());
+        if (isMinimal()) {
+          currentProjectFilter = "all";
+          document.getElementById("projectTabs").classList.remove("open");
+          titleEl.classList.remove("tabs-open");
+        }
+
+        document
+          .getElementById("projectsSettingsSection")
+          .classList.toggle("hidden", isMinimal());
+        document
+          .getElementById("hideProjectTasksSwitch")
+          .classList.toggle(
+            "on",
+            state.settings.hideProjectTasksFromHome === true,
+          );
       }
 
       const ACCENTS = [
@@ -1329,15 +1634,39 @@
         });
       }
 
+      function matchesProjectFilter(tItem) {
+        if (isMinimal()) return true;
+        if (currentProjectFilter !== "all") {
+          return tItem.project === currentProjectFilter;
+        }
+        if (state.settings.hideProjectTasksFromHome && tItem.project) {
+          return false;
+        }
+        return true;
+      }
+
       function render() {
+        if (
+          !isMinimal() &&
+          currentProjectFilter !== "all" &&
+          !getActiveProjects().includes(currentProjectFilter)
+        ) {
+          currentProjectFilter = "all";
+        }
         renderSection("sooner");
         renderSection("later");
-        const activeTotal = state.todos.filter((t) => !t.archived).length;
+        const activeTotal = state.todos.filter(
+          (tItem) => !tItem.archived && matchesProjectFilter(tItem),
+        ).length;
         document.getElementById("totalPill").textContent =
           activeTotal +
           " " +
           (activeTotal === 1 ? t("totalSingular") : t("totalPlural"));
         renderArchive();
+        if (!isMinimal()) {
+          renderProjectTabs();
+          maybeAutoOpenProjectTabs();
+        }
       }
 
       function renderSection(section) {
@@ -1345,6 +1674,7 @@
         const countEl = document.getElementById("count-" + section);
         const items = state.todos
           .filter((tItem) => tItem.section === section && !tItem.archived)
+          .filter(matchesProjectFilter)
           .sort((a, b) => a.order - b.order);
         countEl.textContent = items.length;
 
@@ -1370,6 +1700,34 @@
         );
         btn.style.opacity = items.length > COLLAPSE_LIMIT ? "1" : "0.35";
         btn.classList.toggle("is-expanded", expanded);
+      }
+
+      function renderProjectTabs() {
+        const wrap = document.getElementById("projectTabs");
+        const projects = getActiveProjects();
+        wrap.innerHTML = "";
+
+        const allTab = document.createElement("button");
+        allTab.className =
+          "project-tab" + (currentProjectFilter === "all" ? " active" : "");
+        allTab.textContent = t("allProjectsLabel");
+        allTab.addEventListener("click", () => {
+          currentProjectFilter = "all";
+          render();
+        });
+        wrap.appendChild(allTab);
+
+        projects.forEach((name) => {
+          const tab = document.createElement("button");
+          tab.className =
+            "project-tab" + (currentProjectFilter === name ? " active" : "");
+          tab.textContent = name;
+          tab.addEventListener("click", () => {
+            currentProjectFilter = name;
+            render();
+          });
+          wrap.appendChild(tab);
+        });
       }
 
       function buildRow(item, section, isFirst, isLast) {
@@ -1399,6 +1757,23 @@
           startEditRow(item, text, row);
         });
 
+        const rowMain = document.createElement("div");
+        rowMain.className = "row-main";
+        rowMain.appendChild(text);
+        if (!isMinimal() && item.project) {
+          const badge = document.createElement("div");
+          badge.className = "project-badge";
+          badge.textContent = "#" + item.project;
+          badge.title = t("removeProjectTitle");
+          badge.addEventListener("click", (e) => {
+            e.stopPropagation();
+            item.project = null;
+            saveState();
+            render();
+          });
+          rowMain.appendChild(badge);
+        }
+
         const dragHandle = document.createElement("button");
         dragHandle.className = "drag-handle";
         dragHandle.title = t("dragHandleTitle");
@@ -1422,13 +1797,142 @@
         });
 
         row.appendChild(checkbox);
-        row.appendChild(text);
+        row.appendChild(rowMain);
         row.appendChild(dragHandle);
         row.appendChild(moveBtn);
 
         attachDragHandle(dragHandle, row, item, section);
 
         return row;
+      }
+
+      function attachProjectAutocomplete(inputEl) {
+        let popup = null;
+        let chips = [];
+        let currentMatches = [];
+        let selectedIndex = -1;
+
+        function hide() {
+          if (popup) {
+            popup.remove();
+            popup = null;
+          }
+          chips = [];
+          currentMatches = [];
+          selectedIndex = -1;
+        }
+
+        function position() {
+          const rect = inputEl.getBoundingClientRect();
+          const margin = 6;
+          popup.style.left = rect.left + "px";
+          popup.style.width = rect.width + "px";
+          popup.style.top = rect.bottom + margin + "px";
+          const popupHeight = popup.offsetHeight;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          if (
+            spaceBelow < popupHeight + margin * 2 &&
+            rect.top > popupHeight + margin * 2
+          ) {
+            popup.style.top = rect.top - popupHeight - margin + "px";
+          }
+        }
+
+        function currentToken() {
+          const pos = inputEl.selectionStart || 0;
+          const before = inputEl.value.slice(0, pos);
+          const match = before.match(/#([^\s#]*)$/);
+          return match ? match[1] : null;
+        }
+
+        function applySelection(name) {
+          const pos = inputEl.selectionStart || 0;
+          const before = inputEl.value.slice(0, pos);
+          const after = inputEl.value.slice(pos);
+          const newBefore = before.replace(/#([^\s#]*)$/, "#" + name + " ");
+          inputEl.value = newBefore + after;
+          const caret = newBefore.length;
+          hide();
+          inputEl.focus();
+          inputEl.setSelectionRange(caret, caret);
+        }
+
+        function updateHighlight() {
+          chips.forEach((chip, i) => {
+            chip.classList.toggle("selected", i === selectedIndex);
+          });
+          if (selectedIndex >= 0 && chips[selectedIndex]) {
+            chips[selectedIndex].scrollIntoView({ block: "nearest" });
+          }
+        }
+
+        function show(matches) {
+          if (!popup) {
+            popup = document.createElement("div");
+            popup.className = "project-suggest";
+            document.body.appendChild(popup);
+          }
+          popup.innerHTML = "";
+          chips = [];
+          currentMatches = matches;
+          selectedIndex = -1;
+          matches.forEach((name) => {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "project-chip";
+            chip.textContent = "#" + name;
+            chip.addEventListener("mousedown", (e) => e.preventDefault());
+            chip.addEventListener("click", () => applySelection(name));
+            popup.appendChild(chip);
+            chips.push(chip);
+          });
+          popup.classList.add("open");
+          position();
+        }
+
+        inputEl.addEventListener("keydown", (e) => {
+          if (!popup || chips.length === 0) return;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            selectedIndex =
+              selectedIndex < chips.length - 1 ? selectedIndex + 1 : 0;
+            updateHighlight();
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            selectedIndex =
+              selectedIndex > 0 ? selectedIndex - 1 : chips.length - 1;
+            updateHighlight();
+          } else if (e.key === "Enter" && selectedIndex >= 0) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            applySelection(currentMatches[selectedIndex]);
+          } else if (e.key === "Escape") {
+            hide();
+          }
+        });
+
+        inputEl.addEventListener("input", () => {
+          if (isMinimal()) {
+            hide();
+            return;
+          }
+          const token = currentToken();
+          if (token === null) {
+            hide();
+            return;
+          }
+          const matches = getActiveProjects().filter((name) =>
+            name.toLowerCase().startsWith(token.toLowerCase()),
+          );
+          if (matches.length === 0) {
+            hide();
+            return;
+          }
+          show(matches);
+        });
+        inputEl.addEventListener("blur", hide);
+
+        return { hide };
       }
 
       function startEditRow(item, textEl, row) {
@@ -1438,18 +1942,31 @@
         input.type = "text";
         input.className = "edit-input";
         input.maxLength = 140;
-        input.value = item.text;
+        input.value =
+          !isMinimal() && item.project
+            ? item.text + " #" + item.project
+            : item.text;
         textEl.replaceWith(input);
         input.focus();
         input.select();
+        const autocomplete = attachProjectAutocomplete(input);
 
         let finished = false;
         const finish = (commit) => {
           if (finished) return;
           finished = true;
+          autocomplete.hide();
           const newText = input.value.trim();
           if (commit && newText) {
-            item.text = newText;
+            if (!isMinimal()) {
+              const extracted = extractProjectTag(newText);
+              if (extracted.cleanText) {
+                item.text = extracted.cleanText;
+                item.project = extracted.project;
+              }
+            } else {
+              item.text = newText;
+            }
             saveState();
           }
           render();
@@ -1656,7 +2173,17 @@
       }
 
       function addTodo(text, section) {
-        const clean = text.trim();
+        const raw = text.trim();
+        if (!raw) return;
+        let clean = raw;
+        let project = null;
+        if (!isMinimal()) {
+          const extracted = extractProjectTag(raw);
+          if (extracted.cleanText) {
+            clean = extracted.cleanText;
+            project = extracted.project;
+          }
+        }
         if (!clean) return;
         const maxOrder = Math.max(
           -1,
@@ -1672,6 +2199,7 @@
           archived: false,
           order: maxOrder + 1,
           archivedAt: null,
+          project,
         });
         state.expanded[section] = true;
         render();
@@ -1802,6 +2330,7 @@
       const archivePanel = document.getElementById("archivePanel");
       const settingsPanel = document.getElementById("settingsPanel");
       const newTodoInput = document.getElementById("newTodoText");
+      const addProjectAutocomplete = attachProjectAutocomplete(newTodoInput);
 
       function closeAllPanels() {
         addPanel.classList.remove("open");
@@ -1828,6 +2357,7 @@
         overlay.classList.remove("open");
         newTodoInput.value = "";
         newTodoInput.blur();
+        addProjectAutocomplete.hide();
         setTimeout(updateKeyboardInset, 300);
       }
       document
@@ -1917,6 +2447,33 @@
           state.settings.archiveEnabled === false ? true : false;
         applySettingsToDom();
         saveState();
+      });
+
+      document.getElementById("minimalSwitch").addEventListener("click", () => {
+        state.settings.minimalMode = !isMinimal();
+        applySettingsToDom();
+        render();
+        saveState();
+      });
+
+      document
+        .getElementById("hideProjectTasksSwitch")
+        .addEventListener("click", () => {
+          state.settings.hideProjectTasksFromHome =
+            state.settings.hideProjectTasksFromHome !== true;
+          applySettingsToDom();
+          render();
+          saveState();
+        });
+
+      document.getElementById("appTitle").addEventListener("click", () => {
+        if (isMinimal()) return;
+        const titleEl = document.getElementById("appTitle");
+        const tabs = document.getElementById("projectTabs");
+        const nowOpen = !tabs.classList.contains("open");
+        tabs.classList.toggle("open", nowOpen);
+        titleEl.classList.toggle("tabs-open", nowOpen);
+        if (nowOpen) renderProjectTabs();
       });
 
       overlay.addEventListener("click", closeAllPanels);
