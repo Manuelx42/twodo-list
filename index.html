@@ -1217,25 +1217,32 @@
           t("archivePanelTitle");
       }
 
-      /* ---------- Cookie storage ---------- */
-      const COOKIE_NAME = "todoAppState_v1";
-      const COOKIE_DAYS = 730;
+      /* ---------- Storage ---------- */
+      // Cookies cap out at ~4KB; the growing todo list (with project tags
+      // etc.) could exceed that and silently fail to save. localStorage has
+      // a much higher limit (typically several MB) and no such surprise.
+      const STORAGE_KEY = "todoAppState_v1";
 
-      function setCookie(name, value, days) {
-        const maxAge = days * 24 * 60 * 60;
-        document.cookie =
-          name +
-          "=" +
-          encodeURIComponent(value) +
-          "; max-age=" +
-          maxAge +
-          "; path=/; SameSite=Lax";
-      }
-      function getCookie(name) {
+      function readStoredState() {
+        try {
+          const fromLocalStorage = localStorage.getItem(STORAGE_KEY);
+          if (fromLocalStorage) return fromLocalStorage;
+        } catch (e) {
+          console.error("localStorage nicht verfügbar", e);
+        }
+        // Fall back to (and migrate away from) the legacy cookie storage.
         const match = document.cookie.match(
-          new RegExp("(?:^|; )" + name + "=([^;]*)"),
+          new RegExp("(?:^|; )" + STORAGE_KEY + "=([^;]*)"),
         );
-        return match ? decodeURIComponent(match[1]) : null;
+        if (!match) return null;
+        try {
+          const legacyRaw = decodeURIComponent(match[1]);
+          localStorage.setItem(STORAGE_KEY, legacyRaw);
+          document.cookie = STORAGE_KEY + "=; max-age=0; path=/";
+          return legacyRaw;
+        } catch (e) {
+          return null;
+        }
       }
 
       const COLLAPSE_LIMIT = 3;
@@ -1436,7 +1443,7 @@
 
       function loadState() {
         try {
-          const raw = getCookie(COOKIE_NAME);
+          const raw = readStoredState();
           if (raw) {
             const parsed = JSON.parse(raw);
             if (parsed && Array.isArray(parsed.todos)) {
@@ -1552,7 +1559,7 @@
 
       function saveState() {
         try {
-          setCookie(COOKIE_NAME, JSON.stringify(state), COOKIE_DAYS);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         } catch (e) {
           console.error("Speichern fehlgeschlagen", e);
         }
